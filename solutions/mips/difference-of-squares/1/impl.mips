@@ -1,0 +1,42 @@
+.globl difference_of_squares
+
+difference_of_squares:
+    # Input: $a0 = N
+    # Output: $v0 = (1+2+...+N)^2 - (1^2+2^2+...+N^2)
+    
+    # Save $ra if needed (not needed for leaf function)
+    
+    # Formula: 
+    # Sum = N(N+1)/2
+    # Sum of squares = N(N+1)(2N+1)/6
+    # Difference = [N(N+1)/2]^2 - N(N+1)(2N+1)/6
+    # Simplified: N(N+1)(N-1)(3N+2)/12
+    
+    move $t0, $a0        # $t0 = N
+    
+    # Calculate N(N+1)
+    addi $t1, $t0, 1     # $t1 = N+1
+    mult $t0, $t1        # hi:lo = N*(N+1)
+    mflo $t2             # $t2 = N*(N+1)
+    
+    # Calculate (N-1)
+    addi $t3, $t0, -1    # $t3 = N-1
+    
+    # Calculate (3N+2)
+    li $t4, 3
+    mult $t0, $t4        # hi:lo = 3*N
+    mflo $t4             # $t4 = 3N
+    addi $t4, $t4, 2     # $t4 = 3N+2
+    
+    # Multiply: N(N+1) * (N-1) * (3N+2)
+    mult $t2, $t3        # hi:lo = N(N+1)*(N-1)
+    mflo $t5             # $t5 = N(N+1)(N-1)
+    mult $t5, $t4        # hi:lo = N(N+1)(N-1)*(3N+2)
+    mflo $t5             # $t5 = N(N+1)(N-1)(3N+2)
+    
+    # Divide by 12
+    li $t6, 12
+    div $t5, $t6         # hi:lo = result / 12
+    mflo $v0             # $v0 = final result
+    
+    jr $ra
