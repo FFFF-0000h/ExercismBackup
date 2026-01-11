@@ -1,0 +1,42 @@
+.globl is_leap_year
+
+# Function: is_leap_year
+# Parameters: $a0 = year (32-bit integer)
+# Returns:    $v0 = 1 if leap year, 0 if not
+# Leap year rules:
+# 1. If year % 400 == 0 => leap year
+# 2. Else if year % 100 == 0 => NOT leap year
+# 3. Else if year % 4 == 0 => leap year
+# 4. Else => NOT leap year
+
+is_leap_year:
+    # Save year in $t0
+    move $t0, $a0
+    
+    # Check if divisible by 400
+    li $t1, 400
+    div $t0, $t1        # hi = year % 400, lo = year / 400
+    mfhi $t2            # $t2 = year % 400
+    beq $t2, $zero, is_leap   # if year % 400 == 0, leap year
+    
+    # Check if divisible by 100
+    move $a0, $t0       # Restore year
+    li $t1, 100
+    div $a0, $t1        # hi = year % 100, lo = year / 100
+    mfhi $t2            # $t2 = year % 100
+    beq $t2, $zero, not_leap  # if year % 100 == 0, NOT leap year
+    
+    # Check if divisible by 4
+    move $a0, $t0       # Restore year
+    li $t1, 4
+    div $a0, $t1        # hi = year % 4, lo = year / 4
+    mfhi $t2            # $t2 = year % 4
+    beq $t2, $zero, is_leap   # if year % 4 == 0, leap year
+    
+not_leap:
+    li $v0, 0           # Return 0 (false)
+    jr $ra
+    
+is_leap:
+    li $v0, 1           # Return 1 (true)
+    jr $ra
