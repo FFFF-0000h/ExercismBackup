@@ -1,0 +1,46 @@
+.globl steps
+
+# Function: steps
+# Parameters: $a0 = starting number (n)
+# Returns:    $v0 = number of steps to reach 1, -1 if invalid (n <= 0)
+# Collatz rules:
+# - If n is even: n = n / 2
+# - If n is odd: n = 3*n + 1
+# - Count steps until n == 1
+
+steps:
+    # Check if input is valid (n > 0)
+    blez $a0, invalid_input   # if n <= 0, jump to error
+    
+    li $v0, 0                  # Initialize step counter
+    move $t0, $a0              # Copy n to $t0
+    
+collatz_loop:
+    # Check if we reached 1
+    li $t1, 1
+    beq $t0, $t1, done         # if n == 1, we're done
+    
+    # Check if n is even
+    andi $t2, $t0, 1           # $t2 = n & 1 (0 if even, 1 if odd)
+    beq $t2, $zero, even_case  # if even, jump to even case
+    
+odd_case:
+    # n = 3*n + 1
+    li $t1, 3
+    mul $t0, $t0, $t1          # n = n * 3
+    addiu $t0, $t0, 1          # n = n + 1
+    j increment_counter
+    
+even_case:
+    # n = n / 2
+    srl $t0, $t0, 1            # n = n >> 1 (n / 2)
+    
+increment_counter:
+    addiu $v0, $v0, 1          # Increment step counter
+    j collatz_loop             # Continue loop
+    
+invalid_input:
+    li $v0, -1                 # Return -1 for invalid input
+    
+done:
+    jr $ra                     # Return
