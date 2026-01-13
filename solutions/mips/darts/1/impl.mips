@@ -1,0 +1,35 @@
+.globl score
+
+score:
+    # $a0 = x coordinate (integer)
+    # $a1 = y coordinate (integer)
+    # $v0 = points earned (0, 1, 5, or 10)
+    
+    # Calculate x^2 + y^2 = distance squared from center
+    mul $t0, $a0, $a0      # $t0 = x^2
+    mul $t1, $a1, $a1      # $t1 = y^2
+    add $t2, $t0, $t1      # $t2 = x^2 + y^2 = distance squared
+    
+    # Now check which circle the point falls into
+    # We compare squared distances to avoid square root
+    
+    # Inner circle: radius = 1, so radius^2 = 1
+    # If distance^2 <= 1, score = 10
+    li $v0, 10             # Preload with inner circle score
+    ble $t2, 1, done       # if (dist_sq <= 1) return 10
+    
+    # Middle circle: radius = 5, so radius^2 = 25
+    # If distance^2 <= 25, score = 5
+    li $v0, 5              # Middle circle score
+    ble $t2, 25, done      # if (dist_sq <= 25) return 5
+    
+    # Outer circle: radius = 10, so radius^2 = 100
+    # If distance^2 <= 100, score = 1
+    li $v0, 1              # Outer circle score
+    ble $t2, 100, done     # if (dist_sq <= 100) return 1
+    
+    # Outside target: score = 0
+    li $v0, 0              # Outside target
+    
+done:
+    jr $ra
