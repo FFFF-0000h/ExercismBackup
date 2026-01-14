@@ -1,0 +1,65 @@
+.globl square
+.globl total
+
+# Square function
+# Input: $a0 = square number
+# Output: $v0 = low 32 bits, $v1 = high 32 bits
+square:
+    # Check for invalid inputs: <= 0 or > 64
+    blez $a0, square_invalid
+    li $t0, 64
+    bgt $a0, $t0, square_invalid
+    
+    # For square n: grains = 2^(n-1)
+    
+    # Special case: square 1 = 2^0 = 1
+    li $v0, 1
+    li $v1, 0
+    beq $a0, 1, square_return
+    
+    # Calculate 2^(n-1)
+    addi $t0, $a0, -1    # exponent = n-1
+    
+    # Initialize result = 1
+    li $v0, 1
+    li $v1, 0
+    
+    # Use shift left loop
+    li $t1, 0            # counter
+    
+square_loop:
+    # Check if done
+    beq $t1, $t0, square_return
+    
+    # Shift left 64-bit value in $v1:$v0
+    # Get the bit that will move from low to high
+    srl $t2, $v0, 31
+    
+    # Shift low word
+    sll $v0, $v0, 1
+    
+    # Shift high word and add the bit from low word
+    sll $v1, $v1, 1
+    or $v1, $v1, $t2
+    
+    # Increment counter
+    addi $t1, $t1, 1
+    j square_loop
+
+square_invalid:
+    # For invalid input, return 0
+    li $v0, 0
+    li $v1, 0
+    
+square_return:
+    jr $ra
+
+# Total function
+# Returns total grains on chessboard = 2^64 - 1
+total:
+    # 2^64 - 1 in binary: 64 ones
+    # In hex: 0xFFFFFFFFFFFFFFFF
+    # In two's complement: -1
+    li $v0, -1           # Low word: 0xFFFFFFFF
+    li $v1, -1           # High word: 0xFFFFFFFF
+    jr $ra
