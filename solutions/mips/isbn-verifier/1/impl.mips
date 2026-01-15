@@ -1,0 +1,107 @@
+# | Register | Usage     | Type    | Description                              |
+# | -------- | --------- | ------- | ---------------------------------------- |
+# | `$a0`    | input     | address | null-terminated input string             |
+# | `$v0`    | output    | boolean | valid isbn (`0` = `false`, `1` = `true`) |
+# | `$t0-9`  | temporary | any     | used for temporary storage               |
+
+.globl is_valid
+
+is_valid:
+    # Save return address
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+    
+    # Initialize variables
+    move $t0, $a0          # $t0 = current position in string
+    li $t1, 0             # $t1 = digit count
+    li $t2, 0             # $t2 = checksum
+    li $t3, 10            # $t3 = multiplier (starts at 10)
+    
+    # Loop through the string
+validate_loop:
+    lb $t4, 0($t0)        # Load current character
+    beq $t4, $zero, check_length  # If null terminator, check length
+    
+    # Check if character is a digit '0'-'9'
+    li $t5, '0'
+    li $t6, '9'
+    blt $t4, $t5, check_hyphen   # If less than '0'
+    bgt $t4, $t6, check_x        # If greater than '9'
+    
+    # It's a digit
+    sub $t4, $t4, $t5     # Convert ASCII to value (0-9)
+    j process_digit
+    
+check_x:
+    # Check if character is 'X' or 'x'
+    li $t5, 'X'
+    beq $t4, $t5, is_x
+    li $t5, 'x'
+    beq $t4, $t5, is_x
+    
+    # Check if it's a hyphen
+check_hyphen:
+    li $t5, '-'
+    bne $t4, $t5, invalid_char   # If not hyphen, invalid
+    
+    # Skip hyphen
+    addi $t0, $t0, 1
+    j validate_loop
+    
+is_x:
+    # Check if X is in the right position (must be last character)
+    addi $t0, $t0, 1      # Move to next char
+    lb $t5, 0($t0)        # Check next character
+    bne $t5, $zero, invalid_char  # If not null terminator, invalid
+    
+    # X must be the 10th character
+    bne $t1, 9, invalid_char
+    
+    # X represents value 10
+    li $t4, 10
+    j process_last_digit
+    
+process_digit:
+    addi $t0, $t0, 1      # Move to next character
+    
+process_last_digit:
+    # Check if we already have 10 digits
+    bge $t1, 10, invalid_length
+    
+    # Multiply digit by multiplier and add to checksum
+    mul $t5, $t4, $t3     # digit * multiplier
+    add $t2, $t2, $t5     # Add to checksum
+    
+    # Decrement multiplier for next digit
+    addi $t3, $t3, -1
+    
+    # Increment digit count
+    addi $t1, $t1, 1
+    
+    j validate_loop
+
+invalid_char:
+    li $v0, 0
+    j return
+
+invalid_length:
+    li $v0, 0
+    j return
+
+check_length:
+    # Must have exactly 10 digits
+    bne $t1, 10, invalid_length
+    
+    # Check if checksum mod 11 == 0
+    li $t5, 11
+    div $t2, $t5
+    mfhi $t6              # Get remainder
+    
+    # If remainder is 0, valid ISBN
+    seq $v0, $t6, $zero   # Set $v0 = 1 if remainder == 0, else 0
+    
+return:
+    # Restore return address
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr $ra
