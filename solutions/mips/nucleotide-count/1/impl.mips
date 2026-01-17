@@ -1,0 +1,72 @@
+.globl nucleotide_counts
+
+nucleotide_counts:
+    # Initialize counts array to -1 (in case of error)
+    li $t0, -1
+    sw $t0, 0($a1)    # A count
+    sw $t0, 4($a1)    # C count  
+    sw $t0, 8($a1)    # G count
+    sw $t0, 12($a1)   # T count
+    
+    # Now initialize actual counts to 0 for counting
+    sw $zero, 0($a1)  # A count
+    sw $zero, 4($a1)  # C count  
+    sw $zero, 8($a1)  # G count
+    sw $zero, 12($a1) # T count
+    
+    # Pointer to current character
+    move $t0, $a0     # $t0 = string pointer
+    
+loop:
+    lb $t1, 0($t0)    # Load current character
+    beqz $t1, done    # If null terminator, done
+    
+    # Check for valid nucleotides
+    li $t2, 'A'
+    beq $t1, $t2, count_a
+    li $t2, 'C'
+    beq $t1, $t2, count_c
+    li $t2, 'G'
+    beq $t1, $t2, count_g
+    li $t2, 'T'
+    beq $t1, $t2, count_t
+    
+    # Invalid character - set all counts to -1
+    li $t2, -1
+    sw $t2, 0($a1)    # A count = -1
+    sw $t2, 4($a1)    # C count = -1
+    sw $t2, 8($a1)    # G count = -1
+    sw $t2, 12($a1)   # T count = -1
+    jr $ra            # Return immediately
+
+count_a:
+    lw $t2, 0($a1)    # Load A count
+    addi $t2, $t2, 1  # Increment
+    sw $t2, 0($a1)    # Store back
+    j next_char
+
+count_c:
+    lw $t2, 4($a1)    # Load C count
+    addi $t2, $t2, 1  # Increment
+    sw $t2, 4($a1)    # Store back
+    j next_char
+
+count_g:
+    lw $t2, 8($a1)    # Load G count
+    addi $t2, $t2, 1  # Increment
+    sw $t2, 8($a1)    # Store back
+    j next_char
+
+count_t:
+    lw $t2, 12($a1)   # Load T count
+    addi $t2, $t2, 1  # Increment
+    sw $t2, 12($a1)   # Store back
+    j next_char
+
+next_char:
+    addi $t0, $t0, 1  # Move to next character
+    j loop
+
+done:
+    # Success - counts are already set correctly
+    jr $ra
