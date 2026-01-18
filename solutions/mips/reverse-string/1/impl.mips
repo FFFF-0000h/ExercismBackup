@@ -1,0 +1,39 @@
+.globl reverse
+
+reverse:
+    # Step 1: Find the length of the input string
+    move $t0, $a0        # $t0 = pointer to input string
+    li $t1, 0           # $t1 = length counter
+    
+find_length:
+    lb $t2, 0($t0)      # Load current character
+    beq $t2, $zero, end_find_length  # If null terminator, end
+    addiu $t0, $t0, 1   # Move to next character
+    addiu $t1, $t1, 1   # Increment length
+    j find_length
+    
+end_find_length:
+    # $t1 now contains the length of the string
+    
+    # Step 2: Copy characters in reverse order
+    move $t0, $a0        # Reset $t0 to start of input
+    move $t2, $a1        # $t2 = pointer to output
+    
+    # Calculate pointer to last character of input
+    add $t3, $t0, $t1    # $t3 = input + length
+    addiu $t3, $t3, -1   # $t3 = pointer to last character (not null terminator)
+    
+copy_reverse:
+    blt $t3, $t0, copy_done  # If we've copied all characters, done
+    lb $t4, 0($t3)        # Load character from input end
+    sb $t4, 0($t2)        # Store in output
+    addiu $t2, $t2, 1     # Move output pointer forward
+    addiu $t3, $t3, -1    # Move input pointer backward
+    j copy_reverse
+    
+copy_done:
+    # Add null terminator to output
+    sb $zero, 0($t2)
+    
+    # Return
+    jr $ra
