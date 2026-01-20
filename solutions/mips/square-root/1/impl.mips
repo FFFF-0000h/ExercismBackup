@@ -1,0 +1,61 @@
+.globl square_root
+
+square_root:
+    # Input: $a0 = n (positive integer)
+    # Output: $v0 = floor(sqrt(n))
+    
+    # Handle edge cases
+    beq $a0, $zero, return_zero    # sqrt(0) = 0
+    li $t0, 1
+    beq $a0, $t0, return_one       # sqrt(1) = 1
+    
+    # Method: Binary search for sqrt(n)
+    # left = 1, right = n
+    li $t1, 1          # left = 1
+    move $t2, $a0      # right = n
+    
+binary_search_loop:
+    # while left <= right
+    bgt $t1, $t2, binary_search_done
+    
+    # mid = left + (right - left) / 2
+    sub $t3, $t2, $t1      # right - left
+    srl $t3, $t3, 1        # (right - left) / 2
+    add $t3, $t1, $t3      # mid = left + (right - left) / 2
+    
+    # Check if mid * mid == n
+    mult $t3, $t3
+    mflo $t4               # $t4 = mid * mid
+    
+    beq $t4, $a0, found_exact
+    
+    # If mid * mid > n, search left half
+    bgt $t4, $a0, search_left
+    
+    # Else mid * mid < n, search right half
+    # Update left = mid + 1
+    addi $t1, $t3, 1
+    j binary_search_loop
+    
+search_left:
+    # Update right = mid - 1
+    addi $t2, $t3, -1
+    j binary_search_loop
+    
+found_exact:
+    move $v0, $t3          # return mid
+    jr $ra
+    
+binary_search_done:
+    # When loop ends, right < left
+    # Return right (floor(sqrt(n)))
+    move $v0, $t2
+    jr $ra
+
+return_zero:
+    li $v0, 0
+    jr $ra
+
+return_one:
+    li $v0, 1
+    jr $ra
