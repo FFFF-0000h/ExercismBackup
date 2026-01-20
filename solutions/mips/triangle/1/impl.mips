@@ -1,0 +1,50 @@
+.text
+.globl triangle
+
+triangle:
+    # Input: $a0 = side a, $a1 = side b, $a2 = side c
+    # Output: $v0 = triangle type (0=scalene, 1=isosceles, 2=equilateral, 3=invalid)
+    
+    # Check if all sides > 0
+    blez    $a0, invalid      # if a <= 0, invalid
+    blez    $a1, invalid      # if b <= 0, invalid
+    blez    $a2, invalid      # if c <= 0, invalid
+    
+    # Check triangle inequality: a + b > c
+    add     $t0, $a0, $a1     # $t0 = a + b
+    ble     $t0, $a2, invalid # if a + b <= c, invalid
+    
+    # Check triangle inequality: b + c > a
+    add     $t0, $a1, $a2     # $t0 = b + c
+    ble     $t0, $a0, invalid # if b + c <= a, invalid
+    
+    # Check triangle inequality: a + c > b
+    add     $t0, $a0, $a2     # $t0 = a + c
+    ble     $t0, $a1, invalid # if a + c <= b, invalid
+    
+    # Check if equilateral: a == b == c
+    bne     $a0, $a1, check_isosceles  # if a != b, not equilateral
+    bne     $a0, $a2, check_isosceles  # if a != c, not equilateral
+    # If we get here, a == b == c
+    li      $v0, 2            # equilateral
+    j       done
+    
+check_isosceles:
+    # Check if isosceles: at least two sides equal
+    beq     $a0, $a1, is_isosceles     # if a == b
+    beq     $a0, $a2, is_isosceles     # if a == c
+    beq     $a1, $a2, is_isosceles     # if b == c
+    
+    # If no sides equal, it's scalene
+    li      $v0, 0            # scalene
+    j       done
+    
+is_isosceles:
+    li      $v0, 1            # isosceles
+    j       done
+    
+invalid:
+    li      $v0, 3            # invalid
+    
+done:
+    jr      $ra               # return
