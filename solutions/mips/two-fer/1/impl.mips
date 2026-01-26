@@ -1,0 +1,80 @@
+# impl.mips
+# | Register | Usage        | Type    | Description                                  |
+# | -------- | ------------ | ------- | -------------------------------------------- |
+# | `$a0`    | input        | address | null-terminated name string, or null pointer |
+# | `$a1`    | input/output | address | null-terminated result string                |
+# | `$t0-9`  | temporary    | any     | for temporary storage                        |
+
+.globl two_fer
+
+two_fer:
+    # Save $ra on stack since we're calling another function
+    addi    $sp, $sp, -8
+    sw      $ra, 0($sp)
+    sw      $a0, 4($sp)      # Save original $a0 (name pointer)
+    
+    # Copy "One for " to result string
+    la      $t0, one_for_str
+    move    $t1, $a1         # $t1 = pointer to result buffer
+    
+copy_prefix:
+    lb      $t2, 0($t0)      # Load byte from source
+    beqz    $t2, check_name  # If null terminator, done
+    sb      $t2, 0($t1)      # Store byte to destination
+    addi    $t0, $t0, 1      # Increment source pointer
+    addi    $t1, $t1, 1      # Increment destination pointer
+    j       copy_prefix
+    
+check_name:
+    # Check if name is null or empty
+    lw      $a0, 4($sp)      # Restore $a0 (name pointer)
+    beqz    $a0, use_you     # If null pointer, use "you"
+    
+    # Check if first character is null terminator (empty string)
+    lb      $t0, 0($a0)
+    beqz    $t0, use_you     # If empty string, use "you"
+    
+    # Copy name to result string
+copy_name:
+    lb      $t0, 0($a0)      # Load byte from name
+    beqz    $t0, copy_suffix # If null terminator, done
+    sb      $t0, 0($t1)      # Store byte to result
+    addi    $a0, $a0, 1      # Increment name pointer
+    addi    $t1, $t1, 1      # Increment result pointer
+    j       copy_name
+    
+use_you:
+    # Copy "you" to result string
+    la      $t0, you_str
+copy_you:
+    lb      $t2, 0($t0)      # Load byte from "you" string
+    beqz    $t2, copy_suffix # If null terminator, done
+    sb      $t2, 0($t1)      # Store byte to result
+    addi    $t0, $t0, 1      # Increment source pointer
+    addi    $t1, $t1, 1      # Increment destination pointer
+    j       copy_you
+    
+copy_suffix:
+    # Copy ", one for me." to result string
+    la      $t0, suffix_str
+copy_suffix_loop:
+    lb      $t2, 0($t0)      # Load byte from suffix
+    beqz    $t2, done        # If null terminator, done
+    sb      $t2, 0($t1)      # Store byte to result
+    addi    $t0, $t0, 1      # Increment source pointer
+    addi    $t1, $t1, 1      # Increment destination pointer
+    j       copy_suffix_loop
+    
+done:
+    # Add null terminator to result string
+    sb      $zero, 0($t1)
+    
+    # Restore $ra and return
+    lw      $ra, 0($sp)
+    addi    $sp, $sp, 8
+    jr      $ra
+
+.data
+one_for_str: .asciiz "One for "
+you_str:     .asciiz "you"
+suffix_str:  .asciiz ", one for me."
