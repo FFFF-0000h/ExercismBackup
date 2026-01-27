@@ -1,0 +1,69 @@
+.globl abbreviate
+
+abbreviate:
+    # Save return address
+    move $t9, $ra
+    
+    # $t0 = flag: 1 if we're at start of word
+    li $t0, 1
+
+loop:
+    lb $t1, 0($a0)          # Load character
+    beqz $t1, end_loop      # End if null
+    
+    # Check if alphabetic
+    # Check uppercase range
+    li $t2, 'A'
+    blt $t1, $t2, check_lower
+    li $t2, 'Z'
+    ble $t1, $t2, is_letter
+    
+check_lower:
+    li $t2, 'a'
+    blt $t1, $t2, not_letter
+    li $t2, 'z'
+    bgt $t1, $t2, not_letter
+
+is_letter:
+    # We have a letter
+    beqz $t0, skip_letter   # Skip if not start of word
+    
+    # At start of word - take this letter
+    # Convert to uppercase if needed
+    li $t2, 'a'
+    blt $t1, $t2, already_upper
+    # It's lowercase, convert to uppercase
+    addiu $t1, $t1, -32
+    
+already_upper:
+    sb $t1, 0($a1)          # Store in output
+    addiu $a1, $a1, 1       # Increment output pointer
+    li $t0, 0               # Clear start-of-word flag
+    j next_char
+
+not_letter:
+    # Check if it's a word separator
+    li $t2, ' '
+    beq $t1, $t2, is_separator
+    li $t2, '-'
+    beq $t1, $t2, is_separator
+    li $t2, '\t'
+    beq $t1, $t2, is_separator
+    li $t2, '\n'
+    beq $t1, $t2, is_separator
+    
+    # Other characters (punctuation) - ignore
+    j next_char
+
+is_separator:
+    li $t0, 1               # Next char could start a word
+
+skip_letter:
+next_char:
+    addiu $a0, $a0, 1       # Next input character
+    j loop
+
+end_loop:
+    sb $zero, 0($a1)        # Null-terminate output
+    move $ra, $t9           # Restore return address
+    jr $ra
