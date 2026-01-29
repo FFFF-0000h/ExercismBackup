@@ -1,0 +1,145 @@
+.globl response
+
+response:
+    # Save registers
+    addiu $sp, $sp, -16
+    sw $ra, 0($sp)
+    sw $s0, 4($sp)
+    sw $s1, 8($sp)
+    sw $s2, 12($sp)
+    
+    move $s0, $a0      # Input
+    move $s1, $a1      # Output
+    
+    # Initialize state
+    li $t0, 0          # has_letters flag
+    li $t1, 1          # all_uppercase flag (starts true)
+    li $t2, 0          # is_question flag
+    li $t3, 0          # has_content flag
+    
+    move $t4, $s0      # Current pointer
+    li $s2, 0          # Last non-whitespace char position
+    
+.scan_string:
+    lb $t5, 0($t4)     # Load current char
+    beqz $t5, .end_scan
+    
+    # Check if it's a letter (A-Z or a-z)
+    li $t6, 'A'
+    blt $t5, $t6, .not_a_letter
+    li $t6, 'z'
+    bgt $t5, $t6, .not_a_letter
+    
+    # It's a letter
+    li $t0, 1          # Set has_letters flag
+    li $t3, 1          # Set has_content flag
+    
+    # Check if it's uppercase
+    li $t6, 'Z'
+    ble $t5, $t6, .is_uppercase_letter
+    
+    li $t6, 'a'
+    bge $t5, $t6, .is_lowercase_letter
+    
+    j .next_char
+    
+.is_uppercase_letter:
+    j .next_char       # Already uppercase, continue
+    
+.is_lowercase_letter:
+    # Found a lowercase letter, so not all uppercase
+    li $t1, 0          # Clear all_uppercase flag
+    j .next_char
+    
+.not_a_letter:
+    # Check if it's whitespace
+    li $t6, ' '
+    beq $t5, $t6, .is_whitespace
+    li $t6, '\t'
+    beq $t5, $t6, .is_whitespace
+    li $t6, '\n'
+    beq $t5, $t6, .is_whitespace
+    li $t6, '\r'
+    beq $t5, $t6, .is_whitespace
+    
+    # Not whitespace, so it's content
+    li $t3, 1          # Set has_content flag
+    move $s2, $t4      # Store position of last non-whitespace char
+    
+.is_whitespace:
+.next_char:
+    addiu $t4, $t4, 1
+    j .scan_string
+    
+.end_scan:
+    # Check if last non-whitespace char is '?'
+    beqz $s2, .not_a_question2
+    lb $t5, 0($s2)
+    li $t6, '?'
+    bne $t5, $t6, .not_a_question2
+    li $t2, 1          # Set is_question flag
+    
+.not_a_question2:
+    # Determine response based on flags
+    beqz $t3, .silence_response       # No content
+    
+    # Check for yelling: has letters AND all uppercase
+    beqz $t0, .no_yelling
+    beqz $t1, .no_yelling
+    
+    # It's yelling
+    bnez $t2, .yell_question_response  # Yelling + question
+    j .yell_response                   # Yelling only
+    
+.no_yelling:
+    bnez $t2, .question_response       # Question only
+    j .whatever_response               # Everything else
+    
+.silence_response:
+    la $t8, response_silence
+    j .copy_response
+    
+.question_response:
+    la $t8, response_question
+    j .copy_response
+    
+.yell_response:
+    la $t8, response_yell
+    j .copy_response
+    
+.yell_question_response:
+    la $t8, response_yell_question
+    j .copy_response
+    
+.whatever_response:
+    la $t8, response_whatever
+    
+.copy_response:
+    # Copy the response string to output
+    move $t9, $s1
+    
+.copy_loop:
+    lb $t7, 0($t8)
+    beqz $t7, .done_copy
+    sb $t7, 0($t9)
+    addiu $t8, $t8, 1
+    addiu $t9, $t9, 1
+    j .copy_loop
+    
+.done_copy:
+    sb $zero, 0($t9)   # Null terminate
+    
+.done:
+    lw $ra, 0($sp)
+    lw $s0, 4($sp)
+    lw $s1, 8($sp)
+    lw $s2, 12($sp)
+    addiu $sp, $sp, 16
+    jr $ra
+
+.data
+response_question:      .asciiz "Sure."
+response_yell:          .asciiz "Whoa, chill out!"
+response_yell_question: .asciiz "Calm down, I know what I'm doing!"
+response_silence:       .asciiz "Fine. Be that way!"
+response_whatever:      .asciiz "Whatever."
