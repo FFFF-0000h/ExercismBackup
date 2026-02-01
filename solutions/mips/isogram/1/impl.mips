@@ -1,0 +1,67 @@
+.globl is_isogram
+
+is_isogram:
+    # $a0 = pointer to input string (null-terminated)
+    # $v0 = return value (1 for isogram, 0 for not isogram)
+    # $t0 = current character
+    # $t1 = letter counter array (bitmask in register or memory)
+    # $t2 = temp for calculations
+    
+    # Initialize a 26-bit bitmask to track seen letters
+    # We'll use $t1 as our bitmask (32-bit register, we use bits 0-25 for a-z)
+    li $t1, 0                 # Clear bitmask
+    
+check_char:
+    lb $t0, 0($a0)           # Load current character
+    beqz $t0, is_isogram_true # End of string → isogram
+    
+    # Check if character is a letter (ignore case)
+    # Convert to lowercase if uppercase
+    
+    # Check if uppercase (A-Z)
+    li $t2, 'A'
+    blt $t0, $t2, not_letter  # < 'A', not a letter
+    li $t2, 'Z'
+    ble $t0, $t2, is_uppercase
+    
+    # Check if lowercase (a-z)
+    li $t2, 'a'
+    blt $t0, $t2, not_letter  # < 'a', not a letter
+    li $t2, 'z'
+    bgt $t0, $t2, not_letter  # > 'z', not a letter
+    
+    # Character is lowercase, process it
+    j process_letter
+    
+is_uppercase:
+    # Convert uppercase to lowercase by adding 32
+    addi $t0, $t0, 32
+    
+process_letter:
+    # Now $t0 contains lowercase letter (a-z = 97-122)
+    # Convert to 0-25 index
+    addi $t0, $t0, -97        # 'a' -> 0, 'b' -> 1, etc.
+    
+    # Create bitmask for this letter (1 << index)
+    li $t2, 1
+    sllv $t2, $t2, $t0       # $t2 = 1 << index
+    
+    # Check if this bit is already set in our mask
+    and $t3, $t1, $t2        # $t3 = mask & (1 << index)
+    bnez $t3, is_isogram_false # If non-zero, letter already seen
+    
+    # Set the bit in our mask
+    or $t1, $t1, $t2         # mask |= (1 << index)
+    
+not_letter:
+    # Move to next character
+    addi $a0, $a0, 1
+    j check_char
+    
+is_isogram_false:
+    li $v0, 0
+    jr $ra
+    
+is_isogram_true:
+    li $v0, 1
+    jr $ra
