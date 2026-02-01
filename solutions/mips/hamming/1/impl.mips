@@ -1,0 +1,72 @@
+.globl hamming_distance
+
+# int hamming_distance(const char *str1, const char *str2)
+# Returns the Hamming distance between two strings
+# If strings are different lengths, returns -1
+hamming_distance:
+    # $a0 = first string
+    # $a1 = second string
+    # $v0 = hamming distance (return value)
+    # $t0 = char from str1
+    # $t1 = char from str2
+    # $t2 = length counter for str1
+    # $t3 = length counter for str2
+    
+    # Initialize distance to 0
+    li $v0, 0
+    
+    # Initialize length counters
+    li $t2, 0  # str1 length
+    li $t3, 0  # str2 length
+    
+    # First, check if strings have equal length
+    move $t4, $a0  # temp pointer for str1
+    move $t5, $a1  # temp pointer for str2
+    
+length_check_loop1:
+    lb $t0, 0($t4)       # Load char from str1
+    beqz $t0, length_check_done1  # If null terminator, done
+    addiu $t2, $t2, 1    # Increment length counter
+    addiu $t4, $t4, 1    # Move to next char
+    j length_check_loop1
+    
+length_check_done1:
+    
+length_check_loop2:
+    lb $t1, 0($t5)       # Load char from str2
+    beqz $t1, length_check_done2  # If null terminator, done
+    addiu $t3, $t3, 1    # Increment length counter
+    addiu $t5, $t5, 1    # Move to next char
+    j length_check_loop2
+    
+length_check_done2:
+    
+    # Compare lengths
+    bne $t2, $t3, different_lengths
+    
+    # Lengths are equal, calculate Hamming distance
+compare_loop:
+    lb $t0, 0($a0)       # Load char from str1
+    lb $t1, 0($a1)       # Load char from str2
+    
+    # Check for null terminator (both strings same length)
+    beqz $t0, done       # If end of string, we're done
+    
+    # Compare characters
+    beq $t0, $t1, same_char
+    
+    # Characters are different, increment distance
+    addiu $v0, $v0, 1
+    
+same_char:
+    # Move to next characters
+    addiu $a0, $a0, 1
+    addiu $a1, $a1, 1
+    j compare_loop
+    
+different_lengths:
+    # Strings have different lengths, return -1
+    li $v0, -1
+    
+done:
+    jr $ra
