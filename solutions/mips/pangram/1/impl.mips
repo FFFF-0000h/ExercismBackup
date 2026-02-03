@@ -1,0 +1,27 @@
+.globl is_pangram
+
+is_pangram:
+        move    $t0, $zero
+        li      $t1, 1
+        li      $t3, 'a'
+        li      $t4, 'z'
+        j       load
+
+loop:
+        ori     $t2, 32
+        blt     $t2, $t3, increment
+        bgt     $t2, $t4, increment
+        sub     $t2, $t2, $t3
+        sllv    $t2, $t1, $t2
+        or      $t0, $t0, $t2
+
+increment:
+        addi    $a0, $a0, 1
+
+load:
+        lb      $t2, 0($a0)
+        bne     $t2, $zero, loop
+
+        li      $t2, 0x3ffffff
+        seq     $v0, $t0, $t2
+        jr      $ra
