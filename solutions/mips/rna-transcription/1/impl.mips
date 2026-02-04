@@ -1,0 +1,70 @@
+.globl transcribe_rna
+
+transcribe_rna:
+    # Input: $a0 = address of null-terminated DNA string
+    #        $a1 = address of buffer for null-terminated RNA string
+    # Output: RNA string stored at $a1
+    
+    # Save return address if needed (though not strictly necessary for leaf function)
+    # We'll use $t0 for current character, $t1 for loop index
+    
+    # Loop through each character in input string
+transcribe_loop:
+    lb $t0, 0($a0)          # Load current character from DNA string
+    
+    # Check for null terminator
+    beq $t0, $zero, done    # If char == '\0', we're done
+    
+    # Transcribe the character based on DNA->RNA mapping
+    # G -> C, C -> G, T -> A, A -> U
+    
+    # Check for 'G'
+    li $t1, 'G'
+    beq $t0, $t1, is_G
+    
+    # Check for 'C'
+    li $t1, 'C'
+    beq $t0, $t1, is_C
+    
+    # Check for 'T'
+    li $t1, 'T'
+    beq $t0, $t1, is_T
+    
+    # Check for 'A'
+    li $t1, 'A'
+    beq $t0, $t1, is_A
+    
+    # If we get here, it's an invalid character
+    # For this exercise, we assume input is valid DNA
+    # But we can handle invalid by just copying or returning error
+    
+is_G:
+    li $t1, 'C'            # G -> C
+    j store_char
+    
+is_C:
+    li $t1, 'G'            # C -> G
+    j store_char
+    
+is_T:
+    li $t1, 'A'            # T -> A
+    j store_char
+    
+is_A:
+    li $t1, 'U'            # A -> U
+    j store_char
+
+store_char:
+    sb $t1, 0($a1)         # Store transcribed character in output buffer
+    
+    # Move to next character in both strings
+    addiu $a0, $a0, 1      # Increment input pointer
+    addiu $a1, $a1, 1      # Increment output pointer
+    
+    j transcribe_loop      # Continue loop
+
+done:
+    # Add null terminator to output string
+    sb $zero, 0($a1)
+    
+    jr $ra                 # Return to caller
