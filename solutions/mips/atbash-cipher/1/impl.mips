@@ -1,0 +1,48 @@
+# Implement the atbash cipher, where the alphabet is reversed, such that A maps
+# to Z, B to Y and so on. Non-letter characters are not included, but the cipher-
+# text has a space every five characters.
+
+# Register use
+# $t0 -> counter to 5
+# $t1 -> pointer into the plaintext string
+# $t2 -> character
+# $t3 -> pointer into the ciphertext string
+
+
+				.text
+				.globl			atbash_cipher
+atbash_cipher:
+	li		$t0, 0				# zero our 5-counter
+	move	$t1, $a0			# store the input string
+	move	$t3, $a1			# and the output string
+loop:
+	lb		$t2, 0($t1)			# load the character
+	addi	$t1, $t1, 1			# increment our pointer into the plaintext
+	beqz	$t2, done			# if it's null, we're done
+
+space_added:
+	bgt		$t2, 'z', loop		# a few punctuation chars here, like {}
+	bgt		$t2, '`', encrypt	# this is a lowercase letter
+	blt		$t2, 'A', loop		# definitely something we don't want to convert
+	addi	$t2, $t2, 0x20		# we downcase the uppercase letter
+
+encrypt:
+	beq		$t0, 5, add_space	# do this here to prevent an off-by-one error
+	addi	$t2, $t2, -0x60		# make 'a' = 1, 'b' = 2 etc
+	li		$t4, 27				# the letter is ciphered by 27
+	sub		$t2, $t4, $t2		# minus its position in the alphabet
+	addi	$t2, $t2, 0x60		# we get its ASCII value back
+	sb		$t2, 0($t3)			# write it to the returned value
+	addi	$t3, $t3, 1			# and increment its pointer
+	addi	$t0, $t0, 1			# also increment our 5-counter
+	b		loop
+
+add_space:
+	li		$t0, 0				# zero the counter again
+	li		$t4, ' '			# load space character
+	sb		$t4, 0($t3)			# insert it
+	addi	$t3, $t3, 1			# move to next char in ciphertext
+	b		encrypt
+
+done:
+	jr		$ra					# return
