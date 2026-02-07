@@ -1,0 +1,53 @@
+# | Register | Usage        | Type    | Description                    |
+# | -------- | ------------ | ------- | ------------------------------ |
+# | `$a0`    | input        | address | array elements                 |
+# | `$a1`    | input        | integer | size of array, in words        |
+# | `$a2`    | input        | integer | value being searched for       |
+# | `$v0`    | output       | integer | index of value in array, or -1 |
+# | `$t0-9`  | temporary    | any     | for temporary storage          |
+
+.globl find
+
+find:
+    # Initialize left and right indices
+    li $t0, 0            # $t0 = left = 0
+    move $t1, $a1        # $t1 = right = size
+    addi $t1, $t1, -1    # right = size - 1 (0-based indexing)
+    
+    li $v0, -1           # Initialize return value to -1 (not found)
+    
+binary_search_loop:
+    # Check if left > right (search exhausted)
+    bgt $t0, $t1, search_done
+    
+    # Calculate middle = left + (right - left) / 2
+    sub $t2, $t1, $t0    # $t2 = right - left
+    srl $t2, $t2, 1      # $t2 = (right - left) / 2
+    add $t2, $t0, $t2    # $t2 = middle = left + (right - left) / 2
+    
+    # Load array[middle] into $t3
+    sll $t4, $t2, 2      # Multiply middle by 4 (word size)
+    add $t4, $a0, $t4    # $t4 = address of array[middle]
+    lw $t3, 0($t4)       # $t3 = array[middle]
+    
+    # Compare array[middle] with target value
+    beq $t3, $a2, found  # if array[middle] == target, found!
+    blt $t3, $a2, target_greater  # if array[middle] < target
+    
+    # If we get here, array[middle] > target
+    # Eliminate right half: right = middle - 1
+    addi $t1, $t2, -1
+    j binary_search_loop
+    
+target_greater:
+    # array[middle] < target
+    # Eliminate left half: left = middle + 1
+    addi $t0, $t2, 1
+    j binary_search_loop
+    
+found:
+    # Found the target at index $t2
+    move $v0, $t2        # Return the index
+    
+search_done:
+    jr $ra
