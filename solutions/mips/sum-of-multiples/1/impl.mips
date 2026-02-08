@@ -1,0 +1,106 @@
+.globl sum
+
+sum:
+    # Input: $a0 = array of factors
+    #        $a1 = number of factors
+    #        $a2 = limit
+    # Output: $v0 = sum of unique multiples within limit
+    
+    # Save registers we'll modify
+    addiu $sp, $sp, -32
+    sw $ra, 28($sp)
+    sw $s0, 24($sp)
+    sw $s1, 20($sp)
+    sw $s2, 16($sp)
+    sw $s3, 12($sp)
+    sw $s4, 8($sp)
+    
+    # Initialize sum to 0
+    move $v0, $zero
+    
+    # If no factors or limit <= 0, return 0
+    blez $a1, done
+    blez $a2, done
+    
+    # We'll use an array to track which numbers have been counted
+    # Since limit <= 100 based on constraints, we can allocate on stack
+    # Create boolean array on stack: limit bytes (all initialized to 0)
+    
+    # Allocate space for visited array (limit bytes)
+    subu $sp, $sp, $a2          # Allocate limit bytes on stack
+    
+    # Initialize visited array to 0 (false)
+    move $t0, $sp               # $t0 = pointer to visited array
+    move $t1, $a2               # $t1 = limit (counter)
+    move $t2, $zero             # $t2 = 0
+    
+init_loop:
+    beqz $t1, init_done
+    sb $t2, 0($t0)              # Store 0 (false)
+    addiu $t0, $t0, 1           # Next byte
+    addiu $t1, $t1, -1          # Decrement counter
+    j init_loop
+    
+init_done:
+    # Loop through each factor
+    move $s0, $a0               # $s0 = factors array pointer
+    move $s1, $a1               # $s1 = number of factors (counter)
+    move $s2, $a2               # $s2 = limit
+    
+factor_loop:
+    beqz $s1, factors_done      # If no more factors, done
+    
+    # Load current factor
+    lw $s3, 0($s0)              # $s3 = current factor
+    
+    # Skip if factor <= 0
+    blez $s3, next_factor
+    
+    # Generate multiples of this factor
+    move $t0, $s3               # $t0 = current multiple (start with factor)
+    
+multiple_loop:
+    # Check if multiple >= limit
+    bge $t0, $s2, next_factor   # If multiple >= limit, done with this factor
+    
+    # Calculate index in visited array
+    move $t1, $sp               # $t1 = visited array base
+    addu $t1, $t1, $t0          # $t1 = visited[index]
+    
+    # Check if already visited
+    lb $t2, 0($t1)
+    bnez $t2, skip_multiple     # If already visited (non-zero), skip
+    
+    # Mark as visited
+    li $t2, 1
+    sb $t2, 0($t1)
+    
+    # Add to sum
+    addu $v0, $v0, $t0
+    
+skip_multiple:
+    # Next multiple: t0 = t0 + factor
+    addu $t0, $t0, $s3
+    j multiple_loop
+    
+next_factor:
+    # Move to next factor
+    addiu $s0, $s0, 4           # Next word (4 bytes per int)
+    addiu $s1, $s1, -1          # Decrement factor count
+    j factor_loop
+
+factors_done:
+    # Clean up stack (remove visited array)
+    addu $sp, $sp, $a2          # Deallocate visited array
+    
+done:
+    # Restore registers
+    lw $s4, 8($sp)
+    lw $s3, 12($sp)
+    lw $s2, 16($sp)
+    lw $s1, 20($sp)
+    lw $s0, 24($sp)
+    lw $ra, 28($sp)
+    addiu $sp, $sp, 32
+    
+    jr $ra
