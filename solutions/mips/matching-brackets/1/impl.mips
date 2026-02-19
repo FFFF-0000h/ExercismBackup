@@ -1,0 +1,80 @@
+# is_paired - check if brackets are balanced
+# $a0: pointer to null-terminated input string
+# $v0: 1 if balanced, 0 otherwise
+
+.globl is_paired
+
+is_paired:
+    # preserve original stack pointer
+    move $t8, $sp
+    move $t0, $a0          # pointer to string
+
+loop:
+    lb $t1, 0($t0)         # load current character
+    beqz $t1, end_loop     # end of string
+
+    # check for opening brackets
+    li $t2, '('
+    beq $t1, $t2, push_open
+    li $t2, '{'
+    beq $t1, $t2, push_open
+    li $t2, '['
+    beq $t1, $t2, push_open
+
+    # check for closing brackets
+    li $t2, ')'
+    beq $t1, $t2, check_close
+    li $t2, '}'
+    beq $t1, $t2, check_close
+    li $t2, ']'
+    beq $t1, $t2, check_close
+
+    # ignore any other character
+    j next_char
+
+push_open:
+    # push the opening bracket onto the stack
+    addiu $sp, $sp, -4
+    sw $t1, 0($sp)
+    j next_char
+
+check_close:
+    # if stack is empty, mismatch
+    beq $sp, $t8, mismatch
+    # pop the top bracket
+    lw $t2, 0($sp)
+    addiu $sp, $sp, 4
+    # $t1 = closing bracket, $t2 = expected opening bracket
+    li $t3, ')'
+    bne $t1, $t3, not_paren
+    li $t3, '('
+    bne $t2, $t3, mismatch
+    j next_char
+not_paren:
+    li $t3, '}'
+    bne $t1, $t3, not_brace
+    li $t3, '{'
+    bne $t2, $t3, mismatch
+    j next_char
+not_brace:
+    # must be ']'
+    li $t3, '['
+    bne $t2, $t3, mismatch
+    j next_char
+
+next_char:
+    addiu $t0, $t0, 1      # move to next character
+    j loop
+
+end_loop:
+    beq $sp, $t8, success  # stack empty -> balanced
+    # otherwise fall through to mismatch
+
+mismatch:
+    move $sp, $t8          # restore stack pointer
+    li $v0, 0
+    jr $ra
+
+success:
+    li $v0, 1
+    jr $ra
