@@ -1,0 +1,66 @@
+.globl valid
+
+valid:
+    # First pass: count digits and validate
+    move $t1, $a0          # pointer to string
+    li   $t0, 0            # digit count
+loop_first:
+    lb   $t2, 0($t1)
+    beqz $t2, end_first
+    li   $t3, ' '
+    beq  $t2, $t3, skip_first
+    # check if digit
+    li   $t3, '0'
+    blt  $t2, $t3, invalid
+    li   $t3, '9'
+    bgt  $t2, $t3, invalid
+    addi $t0, $t0, 1       # count++
+skip_first:
+    addi $t1, $t1, 1
+    j    loop_first
+end_first:
+    # if count <= 1, invalid
+    li   $t2, 1
+    ble  $t0, $t2, invalid
+
+    # Second pass: process from right
+    addi $t1, $t1, -1      # point to last character (before null)
+    move $t3, $t0           # remaining digits
+    li   $t4, 0             # sum
+    li   $t5, 0             # double flag (0 = no double, 1 = double)
+loop_back:
+    beqz $t3, check_sum     # all digits processed
+    lb   $t2, 0($t1)
+    li   $t6, ' '
+    beq  $t2, $t6, skip_back
+    # digit (validated)
+    sub  $t2, $t2, '0'      # convert to integer
+    beqz $t5, no_double
+    # double it
+    add  $t2, $t2, $t2
+    li   $t6, 9
+    ble  $t2, $t6, after_double
+    addi $t2, $t2, -9
+after_double:
+no_double:
+    add  $t4, $t4, $t2      # add to sum
+    xori $t5, $t5, 1        # toggle flag for next digit
+    addi $t3, $t3, -1       # one digit processed
+skip_back:
+    addi $t1, $t1, -1       # move left
+    j    loop_back
+
+check_sum:
+    li   $t0, 10
+    div  $t4, $t0
+    mfhi $t0
+    beqz $t0, valid_ret
+    j    invalid
+
+valid_ret:
+    li   $v0, 1
+    jr   $ra
+
+invalid:
+    li   $v0, 0
+    jr   $ra
