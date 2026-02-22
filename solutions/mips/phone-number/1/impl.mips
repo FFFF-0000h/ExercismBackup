@@ -1,0 +1,94 @@
+# | Register | Usage        | Type    | Description                            |
+# | -------- | ------------ | ------- | -------------------------------------- |
+# | `$a0`    | input/output | address | phone number as null-terminated string |
+# | `$t0-9`  | temporary    | any     | used for temporary storage             |
+
+.globl clean
+
+clean:
+    # First pass: count digits
+    move    $t0, $a0            # copy input pointer
+    li      $t2, 0              # digit count
+count_loop:
+    lb      $t3, 0($t0)
+    beqz    $t3, count_done
+    li      $t5, '0'
+    blt     $t3, $t5, count_next
+    li      $t5, '9'
+    bgt     $t3, $t5, count_next
+    addi    $t2, $t2, 1         # found a digit
+count_next:
+    addi    $t0, $t0, 1
+    j       count_loop
+count_done:
+    # Check if we have 10 or 11 digits
+    li      $t5, 10
+    beq     $t2, $t5, prepare_store
+    li      $t5, 11
+    beq     $t2, $t5, prepare_store
+    j       invalid             # wrong length → invalid
+
+prepare_store:
+    # Allocate 12 bytes on stack to store digits
+    addi    $sp, $sp, -12
+    move    $t4, $sp            # buffer pointer
+    # Second pass: store digits in buffer
+    move    $t0, $a0
+store_loop:
+    lb      $t3, 0($t0)
+    beqz    $t3, store_done
+    li      $t5, '0'
+    blt     $t3, $t5, store_next
+    li      $t5, '9'
+    bgt     $t3, $t5, store_next
+    sb      $t3, 0($t4)
+    addi    $t4, $t4, 1
+store_next:
+    addi    $t0, $t0, 1
+    j       store_loop
+store_done:
+    # Now buffer at $sp holds the digits
+    li      $t5, 11
+    bne     $t2, $t5, start_10
+    # 11 digits: check first digit is '1'
+    lb      $t3, 0($sp)
+    li      $t5, '1'
+    bne     $t3, $t5, invalid_pop
+    addi    $t4, $sp, 1         # skip country code
+    j       validate
+start_10:
+    move    $t4, $sp            # start of 10‑digit number
+
+validate:
+    # Area code first digit (at $t4) must be 2–9
+    lb      $t3, 0($t4)
+    li      $t5, '2'
+    blt     $t3, $t5, invalid_pop
+    li      $t5, '9'
+    bgt     $t3, $t5, invalid_pop
+    # Exchange code first digit (at $t4+3) must be 2–9
+    lb      $t3, 3($t4)
+    li      $t5, '2'
+    blt     $t3, $t5, invalid_pop
+    li      $t5, '9'
+    bgt     $t3, $t5, invalid_pop
+
+    # Valid: copy 10 digits back to original string
+    move    $t0, $a0
+    li      $t1, 10
+copy_loop:
+    lb      $t3, 0($t4)
+    sb      $t3, 0($t0)
+    addi    $t4, $t4, 1
+    addi    $t0, $t0, 1
+    addi    $t1, $t1, -1
+    bnez    $t1, copy_loop
+    sb      $zero, 0($t0)       # null‑terminate
+    addi    $sp, $sp, 12        # restore stack
+    jr      $ra
+
+invalid_pop:
+    addi    $sp, $sp, 12        # restore stack before invalid
+invalid:
+    sb      $zero, 0($a0)       # empty string
+    jr      $ra
