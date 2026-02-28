@@ -1,0 +1,38 @@
+.globl factors
+
+factors:
+        li $v0, 0
+        li $t9, 1
+        li $t8, 2
+        li $t0, 3
+
+_f2:
+        andi $t1, $a0, 1
+        bnez $t1, _loop
+        sw $t8, ($a1)
+        addi $a1, $a1, 4
+        addi $v0, $v0, 1
+        srl $a0, $a0, 1
+        j _f2
+
+_loop:
+        divu $a0, $t0
+        mfhi $t1
+        bnez $t1, _next
+        sw $t0, ($a1)
+        addi $a1, $a1, 4
+        addi $v0, $v0, 1
+        mflo $a0
+        j _loop
+_next:
+        addi $t0, $t0, 2
+        mul $t1, $t0, $t0
+        bleu $t1, $a0, _loop
+
+_done:
+        beq $a0, $t9, _skip
+        sw $a0, ($a1)
+        addi $a1, $a1, 4
+        addi $v0, $v0, 1
+_skip:
+        jr $ra
