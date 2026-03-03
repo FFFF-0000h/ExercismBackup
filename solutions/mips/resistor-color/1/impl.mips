@@ -1,0 +1,57 @@
+.data
+# Color names in order: black, brown, red, orange, yellow, green, blue, violet, grey, white
+colors:
+    .word color_black, color_brown, color_red, color_orange, color_yellow
+    .word color_green, color_blue, color_violet, color_grey, color_white
+
+color_black:  .asciiz "black"
+color_brown:  .asciiz "brown"
+color_red:    .asciiz "red"
+color_orange: .asciiz "orange"
+color_yellow: .asciiz "yellow"
+color_green:  .asciiz "green"
+color_blue:   .asciiz "blue"
+color_violet: .asciiz "violet"
+color_grey:   .asciiz "grey"
+color_white:  .asciiz "white"
+
+.text
+.globl color_code
+
+# Input: $a0 = pointer to color string (null-terminated)
+# Output: $v0 = resistor value (0-9)
+color_code:
+    # Save return address if needed? Not necessary since we use jr $ra at end.
+    # We'll use $t0 as index, $t1 as pointer to current color string
+    li $t0, 0                # index = 0
+    la $t2, colors           # base address of color pointer array
+
+loop:
+    # Load address of color string from array
+    sll $t3, $t0, 2          # offset = index * 4
+    add $t3, $t2, $t3        # address of pointer
+    lw $t1, 0($t3)           # $t1 = pointer to color string
+
+    # Compare input string (at $a0) with color string (at $t1)
+    move $t4, $a0            # input pointer
+    move $t5, $t1            # color pointer
+
+compare_loop:
+    lb $t6, 0($t4)           # char from input
+    lb $t7, 0($t5)           # char from color
+    bne $t6, $t7, next_color # if different, go to next color
+    beqz $t6, match_found    # if both null, we reached end and they match
+    addiu $t4, $t4, 1
+    addiu $t5, $t5, 1
+    j compare_loop
+
+next_color:
+    addiu $t0, $t0, 1
+    blt $t0, 10, loop        # try next color (0-9)
+    # If not found (shouldn't happen), return -1 or something; but assume valid.
+    li $v0, -1
+    jr $ra
+
+match_found:
+    move $v0, $t0            # return index
+    jr $ra
