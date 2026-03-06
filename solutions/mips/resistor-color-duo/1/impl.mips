@@ -1,0 +1,70 @@
+.globl value
+.data
+colors:
+        .asciiz "black"
+        .asciiz "brown"
+        .asciiz "red"
+        .asciiz "orange"
+        .asciiz "yellow"
+        .asciiz "green"
+        .asciiz "blue"
+        .asciiz "violet"
+        .asciiz "grey"
+        .asciiz "white"
+.text
+
+# Find the value for the color pointed to by $t0. The result is in $t1; in the
+# case of error it is -1
+find:
+        li      $t1, 0
+        la      $t5, colors
+loop:   move    $t2, $t0        # check if entry is equal to the input
+inner:  lb      $t3, ($t2)
+        addi    $t2, $t2, 1
+        lb      $t4, ($t5)
+        addi    $t5, $t5, 1
+        bne     $t3, $t4, next  # the symbol in entry is different from the
+                                # symbol in input; move to the next entry in
+                                # the colors table
+        beq     $t4, 0, out     # all symbols were the same, including
+                                # the terminating zero, so it was the right
+                                # entry; its index is already in $t1
+        j       inner
+
+next:
+        addi    $t1, $t1, 1     # increase the entry number and bail out, if
+                                # the table is over
+        beq     $t1, 10, fail
+next_ch:
+        lb      $t3, ($t5)
+        addi    $t5, $t5, 1
+        beq     $t3, 0, loop    # we found the terminating zero of the table
+                                # entry, $t5 now points to the next entry
+        j       next_ch
+
+fail:
+        li      $t1, -1
+out:
+        jr      $ra
+
+value:
+        sub     $sp, $sp, 4
+        sw      $ra, ($sp)
+        li      $v0, 0
+        move    $t0, $a0
+        jal     find
+        beq     $t1, -1, incorrect
+        move    $v0, $t1
+        mul     $v0, $v0, 10
+        move    $t0, $a1
+        jal     find
+        beq     $t1, -1, incorrect
+        add     $v0, $v0, $t1
+end:
+        lw      $ra, ($sp)
+        addi    $sp, $sp, 4
+        jr      $ra
+
+incorrect:
+        li      $v0, -1
+        j       end
