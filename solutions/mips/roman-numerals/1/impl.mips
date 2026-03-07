@@ -1,0 +1,59 @@
+.data
+val_tbl:  .word 1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1
+sym_tbl:  .word sym_M, sym_CM, sym_D, sym_CD, sym_C, sym_XC, sym_L, sym_XL, sym_X, sym_IX, sym_V, sym_IV, sym_I
+sym_M:    .asciiz "M"
+sym_CM:   .asciiz "CM"
+sym_D:    .asciiz "D"
+sym_CD:   .asciiz "CD"
+sym_C:    .asciiz "C"
+sym_XC:   .asciiz "XC"
+sym_L:    .asciiz "L"
+sym_XL:   .asciiz "XL"
+sym_X:    .asciiz "X"
+sym_IX:   .asciiz "IX"
+sym_V:    .asciiz "V"
+sym_IV:   .asciiz "IV"
+sym_I:    .asciiz "I"
+
+.text
+.globl roman
+
+# Convert integer in $a0 (1..3999) to Roman numeral string at $a1
+roman:
+    move $t0, $a0          # number
+    move $t1, $a1          # output pointer
+    la   $t2, val_tbl      # address of value table
+    la   $t3, sym_tbl      # address of symbol pointer table
+    li   $t4, 13           # number of entries
+    li   $t5, 0            # index
+
+loop_entry:
+    bge  $t5, $t4, done
+    sll  $t6, $t5, 2       # offset = index * 4
+    add  $t7, $t2, $t6
+    lw   $t8, 0($t7)       # current value
+    add  $t7, $t3, $t6
+    lw   $t9, 0($t7)       # address of symbol string
+
+while:
+    blt  $t0, $t8, next_entry   # if number < value, move to next entry
+    # copy symbol at $t9 to buffer
+    move $t7, $t9
+copy_loop:
+    lb   $t6, 0($t7)
+    beqz $t6, copy_done
+    sb   $t6, 0($t1)
+    addi $t1, $t1, 1
+    addi $t7, $t7, 1
+    j    copy_loop
+copy_done:
+    sub  $t0, $t0, $t8     # subtract value
+    j    while             # repeat with same entry
+
+next_entry:
+    addi $t5, $t5, 1
+    j    loop_entry
+
+done:
+    sb   $zero, 0($t1)     # null terminate the string
+    jr   $ra
