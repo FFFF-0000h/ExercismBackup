@@ -1,0 +1,66 @@
+# Implementation of Caesar cipher (ROT) in MIPS assembly
+# Arguments:
+#   $a0: pointer to null-terminated input string
+#   $a1: shift key (integer)
+#   $a2: pointer to output buffer (must be large enough)
+# Returns: none, result stored in buffer at $a2
+
+.globl rotate
+
+rotate:
+    # Compute shift modulo 26 (handle any integer key)
+    li    $t0, 26               # constant 26
+    div   $a1, $t0              # divide key by 26
+    mfhi  $t1                   # $t1 = key % 26 (remainder, 0..25)
+
+    # Initialize pointers
+    move  $t2, $a0              # source pointer
+    move  $t3, $a2              # destination pointer
+
+loop:
+    lb    $t4, 0($t2)           # load current character
+    beqz  $t4, done             # if null, terminate output
+
+    # Check for lowercase letters (a-z)
+    li    $t5, 'a'
+    li    $t6, 'z'
+    blt   $t4, $t5, check_upper
+    bgt   $t4, $t6, check_upper
+
+    # Lowercase transformation
+    sub   $t7, $t4, $t5         # offset from 'a'
+    add   $t7, $t7, $t1         # add shift
+    div   $t7, $t0              # modulo 26
+    mfhi  $t7
+    add   $t7, $t7, $t5         # back to ASCII
+    sb    $t7, 0($t3)
+    j     next
+
+check_upper:
+    # Check for uppercase letters (A-Z)
+    li    $t5, 'A'
+    li    $t6, 'Z'
+    blt   $t4, $t5, not_alpha
+    bgt   $t4, $t6, not_alpha
+
+    # Uppercase transformation
+    sub   $t7, $t4, $t5         # offset from 'A'
+    add   $t7, $t7, $t1         # add shift
+    div   $t7, $t0              # modulo 26
+    mfhi  $t7
+    add   $t7, $t7, $t5         # back to ASCII
+    sb    $t7, 0($t3)
+    j     next
+
+not_alpha:
+    # Non‑alphabetic character: copy as is
+    sb    $t4, 0($t3)
+
+next:
+    addi  $t2, $t2, 1           # advance source
+    addi  $t3, $t3, 1           # advance destination
+    j     loop
+
+done:
+    sb    $zero, 0($t3)         # null‑terminate output
+    jr    $ra                   # return
