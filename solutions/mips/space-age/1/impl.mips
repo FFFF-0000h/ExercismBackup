@@ -1,0 +1,60 @@
+# | Register | Usage     | Type    | Description                                |
+# | -------- | --------- | ------- | ------------------------------------------ |
+# | `$a0`    | input     | integer | planet (`0` = Mercury, `1` = Venus,        |
+# |          |           |         | `2` = Earth, `3` = Mars, `4` = Jupiter,    |
+# |          |           |         | `5` = Saturn, `6` = Uranus, `7` = Neptune) |
+# | `$a1`    | input     | integer | seconds                                    |
+# | `$v0`    | output    | integer | age in hundredths of a year                |
+# | `$t0-9`  | temporary | any     | used for temporary storage                 |
+
+.eqv MERCURY 0
+.eqv VENUS   1
+.eqv EARTH   2
+.eqv MARS    3
+.eqv JUPITER 4
+.eqv SATURN  5
+.eqv URANUS  6
+.eqv NEPTUNE 7
+
+.data
+.align 2
+earth_seconds: .float 31557600.0
+hundred:       .float 100.0
+half:          .float 0.5
+periods:       .float 0.2408467, 0.61519726, 1.0, 1.8808158, 11.862615, 29.447498, 84.016846, 164.79132
+
+.text
+.globl age
+
+age:
+        # Load address of periods table
+        la   $t0, periods
+        sll  $a0, $a0, 2           # index * 4 (word offset)
+        addu $t0, $t0, $a0         # address of the period for this planet
+        l.s  $f0, 0($t0)           # $f0 = orbital period in Earth years
+
+        # Load constants
+        la   $t1, earth_seconds
+        l.s  $f2, 0($t1)           # $f2 = 31557600.0
+        la   $t1, hundred
+        l.s  $f4, 0($t1)           # $f4 = 100.0
+        la   $t1, half
+        l.s  $f6, 0($t1)           # $f6 = 0.5
+
+        # Convert seconds from int to float
+        mtc1 $a1, $f8
+        cvt.s.w $f8, $f8           # $f8 = (float)seconds
+
+        # divisor = earth_year_seconds * period
+        mul.s $f10, $f2, $f0       # $f10 = 31557600.0 * period
+
+        # age in hundredths (floating point)
+        mul.s $f12, $f8, $f4       # $f12 = seconds * 100.0
+        div.s $f14, $f12, $f10     # $f14 = (seconds * 100) / divisor
+
+        # Round to nearest integer (add 0.5 and truncate)
+        add.s $f14, $f14, $f6      # $f14 += 0.5
+        trunc.w.s $f16, $f14       # $f16 = (int)trunc($f14)
+        mfc1 $v0, $f16             # $v0 = result
+
+        jr   $ra
