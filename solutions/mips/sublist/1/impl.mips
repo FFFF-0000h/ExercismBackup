@@ -1,0 +1,166 @@
+# | Register | Usage     | Type    | Description                                                |
+# | -------- | --------- | ------- | ---------------------------------------------------------- |
+# | `$a0`    | input     | address | array one elements                                         |
+# | `$a1`    | input     | integer | size of array one, in words                                |
+# | `$a2`    | input     | address | array two elements                                         |
+# | `$a3`    | input     | integer | size of array two, in words                                |
+# | `$v0`    | output    | integer | `0` = unequal, `1` = equal, `2` = sublist, `3` = superlist |
+# | `$t0-9`  | temporary | any     | used for temporary storage                                 |
+
+.eqv UNEQUAL   0
+.eqv EQUAL     1
+.eqv SUBLIST   2
+.eqv SUPERLIST 3
+
+.globl sublist
+
+sublist:
+    addiu   $sp, $sp, -32
+    sw      $ra, 28($sp)        # save return address
+    sw      $a0, 0($sp)         # save A addr
+    sw      $a1, 4($sp)         # save A size
+    sw      $a2, 8($sp)         # save B addr
+    sw      $a3, 12($sp)        # save B size
+
+    # Check for equality first
+    lw      $t0, 4($sp)         # size A
+    lw      $t1, 12($sp)        # size B
+    bne     $t0, $t1, check_sublist_super
+
+    # Sizes equal: compare elements
+    lw      $a0, 0($sp)         # A addr
+    lw      $a1, 8($sp)         # B addr
+    lw      $a2, 4($sp)         # size (words)
+    jal     arrays_equal
+    beq     $v0, 1, return_equal
+
+    # Sizes equal but content differs => unequal (cannot be sublist/superlist)
+    j       return_unequal
+
+return_equal:
+    li      $v0, EQUAL
+    lw      $ra, 28($sp)
+    addiu   $sp, $sp, 32
+    jr      $ra
+
+return_unequal:
+    li      $v0, UNEQUAL
+    lw      $ra, 28($sp)
+    addiu   $sp, $sp, 32
+    jr      $ra
+
+check_sublist_super:
+    # Check for empty array cases
+    lw      $t0, 4($sp)         # size A
+    lw      $t1, 12($sp)        # size B
+    beq     $t0, $zero, a_empty
+    beq     $t1, $zero, b_empty
+
+    # Both non-empty, determine which is smaller
+    sltu    $t2, $t0, $t1        # $t2 = 1 if sizeA < sizeB
+    bne     $t2, $zero, try_a_sublist_b
+    # sizeA >= sizeB, try B sublist of A
+    lw      $a0, 8($sp)         # needle = B
+    lw      $a1, 12($sp)        # needle len
+    lw      $a2, 0($sp)         # haystack = A
+    lw      $a3, 4($sp)         # haystack len
+    jal     contains
+    beq     $v0, 1, return_superlist
+    j       return_unequal
+
+try_a_sublist_b:
+    # sizeA < sizeB, try A sublist of B
+    lw      $a0, 0($sp)         # needle = A
+    lw      $a1, 4($sp)         # needle len
+    lw      $a2, 8($sp)         # haystack = B
+    lw      $a3, 12($sp)        # haystack len
+    jal     contains
+    beq     $v0, 1, return_sublist
+    j       return_unequal
+
+a_empty:
+    # A empty, B non-empty? (since equality handled earlier, B must be non-empty)
+    li      $v0, SUBLIST
+    lw      $ra, 28($sp)
+    addiu   $sp, $sp, 32
+    jr      $ra
+
+b_empty:
+    # B empty, A non-empty
+    li      $v0, SUPERLIST
+    lw      $ra, 28($sp)
+    addiu   $sp, $sp, 32
+    jr      $ra
+
+return_sublist:
+    li      $v0, SUBLIST
+    lw      $ra, 28($sp)
+    addiu   $sp, $sp, 32
+    jr      $ra
+
+return_superlist:
+    li      $v0, SUPERLIST
+    lw      $ra, 28($sp)
+    addiu   $sp, $sp, 32
+    jr      $ra
+
+# Helper: arrays_equal(addr1, addr2, size)
+# $a0 = addr1, $a1 = addr2, $a2 = size (words)
+# Returns $v0 = 1 if equal, 0 otherwise
+arrays_equal:
+    move    $t0, $a0
+    move    $t1, $a1
+    move    $t2, $a2
+    beq     $t2, $zero, equal_yes
+equal_loop:
+    lw      $t3, 0($t0)
+    lw      $t4, 0($t1)
+    bne     $t3, $t4, equal_no
+    addiu   $t0, $t0, 4
+    addiu   $t1, $t1, 4
+    addiu   $t2, $t2, -1
+    bne     $t2, $zero, equal_loop
+equal_yes:
+    li      $v0, 1
+    jr      $ra
+equal_no:
+    li      $v0, 0
+    jr      $ra
+
+# Helper: contains(needle, needle_len, haystack, haystack_len)
+# $a0 = needle addr, $a1 = needle_len, $a2 = haystack addr, $a3 = haystack_len
+# Returns $v0 = 1 if needle is contiguous sublist, else 0.
+contains:
+    # If needle_len == 0, always true
+    beq     $a1, $zero, contains_true
+    # If needle_len > haystack_len, impossible
+    sltu    $t0, $a3, $a1
+    bne     $t0, $zero, contains_false
+
+    subu    $t0, $a3, $a1       # max i = haystack_len - needle_len
+    li      $t1, 0               # i = 0
+    move    $t2, $a2             # haystack base
+outer_loop:
+    bgt     $t1, $t0, contains_false
+    move    $t3, $zero           # j = 0
+    sll     $t4, $t1, 2          # byte offset = i*4
+    addu    $t4, $t2, $t4        # address of haystack[i]
+    move    $t5, $a0             # needle base
+inner_loop:
+    beq     $t3, $a1, contains_true   # all matched
+    lw      $t6, 0($t4)
+    lw      $t7, 0($t5)
+    bne     $t6, $t7, next_i
+    addiu   $t4, $t4, 4
+    addiu   $t5, $t5, 4
+    addiu   $t3, $t3, 1
+    j       inner_loop
+next_i:
+    addiu   $t1, $t1, 1
+    j       outer_loop
+contains_true:
+    li      $v0, 1
+    jr      $ra
+contains_false:
+    li      $v0, 0
+    jr      $ra
