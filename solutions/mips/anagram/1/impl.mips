@@ -1,0 +1,151 @@
+.globl find_anagrams
+
+find_anagrams:
+    # allocate stack space for frequency arrays
+    # target_freq: 26 words (104 bytes) at offset 0
+    # candidate_freq: 26 words (104 bytes) at offset 104
+    addiu   $sp, $sp, -208
+
+    # set base addresses
+    move    $t9, $sp              # $t9 = target_freq base
+    addiu   $t8, $sp, 104         # $t8 = candidate_freq base
+
+    # ---- Zero target_freq array ----
+    li      $t0, 0
+    move    $t1, $t9
+zero_tf:
+    sw      $zero, 0($t1)
+    addiu   $t1, $t1, 4
+    addiu   $t0, $t0, 1
+    sltiu   $t2, $t0, 26
+    bnez    $t2, zero_tf
+
+    # ---- Process target word ----
+    move    $t0, $a0              # target pointer
+    li      $t7, 0                # target length = 0
+target_loop:
+    lbu     $t1, 0($t0)           # load character
+    beqz    $t1, target_done
+    ori     $t2, $t1, 0x20        # convert to lowercase
+    addiu   $t3, $t2, -97         # index = c - 'a'
+    sll     $t3, $t3, 2
+    addu    $t4, $t9, $t3         # address in target_freq
+    lw      $t1, 0($t4)
+    addiu   $t1, $t1, 1
+    sw      $t1, 0($t4)
+    addiu   $t7, $t7, 1           # increment target length
+    addiu   $t0, $t0, 1
+    j       target_loop
+target_done:
+
+    # ---- Iterate through candidates ----
+    # $a1 = candidates pointer (will be advanced)
+    # $a2 = output pointer
+loop_candidates:
+    lbu     $t0, 0($a1)
+    beqz    $t0, end_all          # null terminator -> finished
+    beq     $t0, 10, skip_newline # 10 = '\n', skip empty lines
+
+    # ---- Begin new candidate word ----
+    move    $t5, $a1              # $t5 = candidate_start
+    li      $t6, 0                # $t6 = candidate_length
+
+    # ---- Zero candidate_freq array ----
+    li      $t0, 0
+    move    $t1, $t8
+clear_cand:
+    sw      $zero, 0($t1)
+    addiu   $t1, $t1, 4
+    addiu   $t0, $t0, 1
+    sltiu   $t2, $t0, 26
+    bnez    $t2, clear_cand
+
+    # ---- Scan candidate word ----
+scan_word:
+    lbu     $t0, 0($a1)
+    beq     $t0, 10, end_word     # newline ends word
+    beqz    $t0, end_word          # null ends word (safety)
+    ori     $t1, $t0, 0x20        # to lowercase
+    addiu   $t2, $t1, -97         # index
+    sll     $t2, $t2, 2
+    addu    $t3, $t8, $t2         # address in candidate_freq
+    lw      $t1, 0($t3)
+    addiu   $t1, $t1, 1
+    sw      $t1, 0($t3)
+    addiu   $t6, $t6, 1           # increment candidate length
+    addiu   $a1, $a1, 1
+    j       scan_word
+
+end_word:
+    # Length check: candidate vs target
+    bne     $t6, $t7, not_anagram
+
+    # ---- Compare frequency arrays ----
+    li      $t0, 0                # offset in bytes
+freq_compare:
+    addu    $t1, $t9, $t0         # target_freq address
+    lw      $t2, 0($t1)
+    addu    $t3, $t8, $t0         # candidate_freq address
+    lw      $t4, 0($t3)
+    bne     $t2, $t4, not_anagram
+    addiu   $t0, $t0, 4
+    sltiu   $t1, $t0, 104
+    bnez    $t1, freq_compare
+
+    # ---- Case‑insensitive identity check ----
+    move    $t0, $a0              # target pointer
+    move    $t1, $t5              # candidate start
+    li      $t2, 0                # index
+identity_loop:
+    beq     $t2, $t7, is_identical
+    lbu     $t3, 0($t0)
+    ori     $t3, $t3, 0x20
+    lbu     $t4, 0($t1)
+    ori     $t4, $t4, 0x20
+    bne     $t3, $t4, not_identical
+    addiu   $t0, $t0, 1
+    addiu   $t1, $t1, 1
+    addiu   $t2, $t2, 1
+    j       identity_loop
+
+is_identical:                     # same word (case‑insensitive) → not an anagram
+    j       not_anagram
+
+not_identical:
+    # ---- Copy candidate word to output ----
+    move    $t0, $t5              # source = candidate_start
+    move    $t1, $a2              # destination = output pointer
+    li      $t2, 0
+copy_loop:
+    beq     $t2, $t7, copy_done
+    lbu     $t3, 0($t0)
+    sb      $t3, 0($t1)
+    addiu   $t0, $t0, 1
+    addiu   $t1, $t1, 1
+    addiu   $t2, $t2, 1
+    j       copy_loop
+copy_done:
+    li      $t3, 10               # newline
+    sb      $t3, 0($t1)
+    addiu   $t1, $t1, 1
+    move    $a2, $t1              # update output pointer
+
+not_anagram:
+next_word:
+    # Advance past the terminator (should be '\n' or '\0')
+    lbu     $t0, 0($a1)
+    beqz    $t0, end_all
+    addiu   $a1, $a1, 1
+    j       loop_candidates
+
+skip_newline:
+    addiu   $a1, $a1, 1
+    j       loop_candidates
+
+end_all:
+    # Null‑terminate output string
+    sb      $zero, 0($a2)
+
+    # Restore stack and return
+    addiu   $sp, $sp, 208
+    jr      $ra
