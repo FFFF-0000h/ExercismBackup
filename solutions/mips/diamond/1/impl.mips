@@ -1,0 +1,115 @@
+# Diamond kata – MIPS32 implementation
+# void rows(char letter, char *buffer);
+# $a0 = letter (A-Z, a-z)
+# $a1 = output buffer (must be large enough for the diamond + null terminator)
+
+.globl rows
+
+rows:
+        addiu   $sp, $sp, -16
+        sw      $ra, 0($sp)
+        sw      $s0, 4($sp)
+        sw      $s1, 8($sp)
+        sw      $s2, 12($sp)
+
+        # Normalise the letter to uppercase ('A'..'Z')
+        move    $t0, $a0
+        li      $t1, 'a'
+        blt     $t0, $t1, already_upper
+        li      $t1, 'z'
+        bgt     $t0, $t1, already_upper
+        addiu   $t0, $t0, -32          # 'a'..'z' -> 'A'..'Z'
+already_upper:
+        # Distance from 'A'
+        subu    $s0, $t0, 'A'          # d = letter - 'A'
+        bltz    $s0, invalid_input
+
+        # number of rows = 2*d + 1
+        sll     $t0, $s0, 1
+        addiu   $s2, $t0, 1            # size
+
+        move    $s1, $zero             # i = 0 (current row)
+        move    $t9, $a1               # write cursor in buffer
+
+row_loop:
+        bge     $s1, $s2, done_rows
+
+        # offset = |i - d|
+        subu    $t0, $s0, $s1          # d - i
+        bgez    $t0, offset_ok
+        subu    $t0, $s1, $s0          # i - d
+offset_ok:
+        move    $t1, $t0               # $t1 = offset
+
+        # letter for this row = 'A' + (d - offset)
+        subu    $t2, $s0, $t1
+        addiu   $t2, $t2, 'A'          # $t2 = char
+
+        # ---- leading spaces ----
+        move    $t3, $t1
+        beqz    $t3, leading_done
+lead_loop:
+        li      $t4, ' '
+        sb      $t4, 0($t9)
+        addiu   $t9, $t9, 1
+        addiu   $t3, $t3, -1
+        bnez    $t3, lead_loop
+leading_done:
+
+        # ---- first letter ----
+        sb      $t2, 0($t9)
+        addiu   $t9, $t9, 1
+
+        # ---- inner spaces (if any) ----
+        subu    $t3, $s0, $t1          # d - offset
+        sll     $t3, $t3, 1
+        addiu   $t3, $t3, -1           # inner = 2*(d-offset)-1
+        bltz    $t3, inner_done
+
+        move    $t4, $t3
+inner_loop:
+        li      $t5, ' '
+        sb      $t5, 0($t9)
+        addiu   $t9, $t9, 1
+        addiu   $t4, $t4, -1
+        bnez    $t4, inner_loop
+
+        # ---- second letter ----
+        sb      $t2, 0($t9)
+        addiu   $t9, $t9, 1
+inner_done:
+
+        # ---- trailing spaces ----
+        move    $t3, $t1
+        beqz    $t3, trailing_done
+trail_loop:
+        li      $t4, ' '
+        sb      $t4, 0($t9)
+        addiu   $t9, $t9, 1
+        addiu   $t3, $t3, -1
+        bnez    $t3, trail_loop
+trailing_done:
+
+        # ---- newline ----
+        li      $t4, '\n'
+        sb      $t4, 0($t9)
+        addiu   $t9, $t9, 1
+
+        # next row
+        addiu   $s1, $s1, 1
+        j       row_loop
+
+done_rows:
+        sb      $zero, 0($t9)          # null terminator
+        j       restore
+
+invalid_input:
+        sb      $zero, 0($a1)          # empty string for invalid input
+
+restore:
+        lw      $ra, 0($sp)
+        lw      $s0, 4($sp)
+        lw      $s1, 8($sp)
+        lw      $s2, 12($sp)
+        addiu   $sp, $sp, 16
+        jr      $ra
