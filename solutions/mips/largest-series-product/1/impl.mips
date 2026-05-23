@@ -1,0 +1,51 @@
+# | Register | Usage        | Type    | Description                   |
+# | -------- | ------------ | ------- | ----------------------------- |
+# | `$a0`    | input        | address | null-terminated digits string |
+# | `$a1`    | input        | integer | span                          |
+# | `$v0`    | output       | integer | largest series product        |
+# | `$t0-9`  | temporary    | any     | for temporary storage         |
+
+.globl largest_product
+
+.eqv input $a0
+.eqv span $a1
+.eqv result $v0
+.eqv digit $t0
+.eqv counter $t1
+.eqv prod $t2
+.eqv input_begin $t3
+.eqv input_size $t4
+
+largest_product:
+	li result, 1
+	beqz span, return
+	bltz span, return_invalid
+	move input_begin, input
+	li result, 0
+	j start
+next_span:	
+	blt prod, result, skip_set_result
+	move result, prod
+skip_set_result:
+	sub input, input, span
+start:
+	li prod, 1
+	move counter, span
+next_digit:
+	lb digit, (input)
+	addi input, input, 1
+	beqz counter, next_span
+	beqz digit, digit_end
+	sub digit, digit, '0'
+	blt digit, 0, return_invalid
+	bgt digit, 9, return_invalid
+	mul prod, prod, digit
+	addi counter, counter, -1
+	j next_digit
+digit_end:
+	sub input_size, input, input_begin
+	blt span, input_size, return
+return_invalid:	
+	li result, -1
+return:
+	jr $ra
