@@ -1,0 +1,41 @@
+.data
+score_table: .byte 1,3,3,2,1,4,2,4,1,8,5,1,3,1,1,3,10,1,1,1,1,4,4,8,4,10
+
+.text
+.globl scrabble_score
+
+scrabble_score:
+        li      $v0, 0              # score = 0
+        move    $a1, $a0            # copy input pointer (optional, we can use $a0 directly)
+
+loop:
+        lbu     $t0, 0($a1)         # load next character
+        beqz    $t0, done           # null terminator -> finished
+
+        # Convert to uppercase if needed
+        li      $t1, 'a'
+        blt     $t0, $t1, not_lower
+        li      $t1, 'z'
+        bgt     $t0, $t1, not_lower
+        addiu   $t0, $t0, -32       # make uppercase
+not_lower:
+
+        # Check if character is a letter A-Z
+        li      $t1, 'A'
+        blt     $t0, $t1, next_char
+        li      $t1, 'Z'
+        bgt     $t0, $t1, next_char
+
+        # Index into score table
+        subu    $t1, $t0, 'A'       # $t1 = letter index (0..25)
+        la      $t2, score_table
+        addu    $t2, $t2, $t1
+        lbu     $t2, 0($t2)         # $t2 = score of the letter
+        addu    $v0, $v0, $t2       # add to total
+
+next_char:
+        addiu   $a1, $a1, 1         # advance to next character
+        j       loop
+
+done:
+        jr      $ra
