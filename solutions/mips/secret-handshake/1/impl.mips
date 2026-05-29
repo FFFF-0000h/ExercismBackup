@@ -1,0 +1,114 @@
+.data
+str_wink:        .asciiz "wink"
+str_double_blink:.asciiz "double blink"
+str_close_eyes:  .asciiz "close your eyes"
+str_jump:        .asciiz "jump"
+
+.text
+.globl commands
+
+commands:
+    # Stack space for up to 4 action indices
+    addiu $sp, $sp, -16
+
+    move $t0, $a0            # $t0 = number (will be shifted)
+    li    $t1, 0             # $t1 = count of actions
+    li    $t2, 0             # $t2 = current bit position (0..3)
+
+bit_loop:
+    andi  $t3, $t0, 1        # test LSB
+    beqz  $t3, skip_bit
+    # Store the bit position (0..3) into the array
+    sll   $t4, $t1, 2
+    addu  $t4, $sp, $t4
+    sw    $t2, 0($t4)
+    addiu $t1, $t1, 1
+skip_bit:
+    srl   $t0, $t0, 1
+    addiu $t2, $t2, 1
+    slti  $t3, $t2, 4        # while bit position < 4
+    bnez  $t3, bit_loop
+
+    move  $t9, $t1            # $t9 = count, preserve for later
+
+    # Check reverse flag (bit 4 of original number)
+    andi  $t0, $a0, 0x10
+    beqz  $t0, no_reverse
+
+    # Reverse the action indices stored on the stack
+    li    $t2, 0              # i = 0
+    addiu $t3, $t9, -1        # j = count - 1
+reverse_loop:
+    slt   $t4, $t2, $t3
+    beqz  $t4, no_reverse
+    # swap array[i] and array[j]
+    sll   $t5, $t2, 2
+    addu  $t5, $sp, $t5
+    lw    $t6, 0($t5)
+    sll   $t7, $t3, 2
+    addu  $t7, $sp, $t7
+    lw    $t8, 0($t7)
+    sw    $t8, 0($t5)
+    sw    $t6, 0($t7)
+    addiu $t2, $t2, 1
+    addiu $t3, $t3, -1
+    j     reverse_loop
+
+no_reverse:
+    # Output pointer in $t4
+    move  $t4, $a1
+
+    # If count == 0, go straight to termination
+    beqz  $t9, output_end
+
+    li    $t5, 0              # k = 0
+output_loop:
+    sll   $t6, $t5, 2
+    addu  $t6, $sp, $t6
+    lw    $t7, 0($t6)         # action index (0..3)
+
+    # Branch to load corresponding string address
+    beqz  $t7, use_wink
+    li    $t8, 1
+    beq   $t7, $t8, use_double
+    li    $t8, 2
+    beq   $t7, $t8, use_close
+    # else 3 (jump)
+    la    $t6, str_jump
+    j     copy_string
+
+use_wink:
+    la    $t6, str_wink
+    j     copy_string
+use_double:
+    la    $t6, str_double_blink
+    j     copy_string
+use_close:
+    la    $t6, str_close_eyes
+
+copy_string:
+    lb    $t8, 0($t6)
+    beqz  $t8, after_copy
+    sb    $t8, 0($t4)
+    addiu $t6, $t6, 1
+    addiu $t4, $t4, 1
+    j     copy_string
+
+after_copy:
+    addiu $t5, $t5, 1          # k++
+    bge   $t5, $t9, output_end # all actions processed?
+
+    # Insert separator: ", "
+    li    $t8, ','
+    sb    $t8, 0($t4)
+    addiu $t4, $t4, 1
+    li    $t8, ' '
+    sb    $t8, 0($t4)
+    addiu $t4, $t4, 1
+    j     output_loop
+
+output_end:
+    sb    $zero, 0($t4)        # null-terminate the string
+
+    addiu $sp, $sp, 16
+    jr    $ra
