@@ -1,0 +1,98 @@
+.globl proteins
+
+# Codon numeric representations
+.eqv AUG 0x00475541
+.eqv UUU 0x00555555
+.eqv UUC 0x00435555
+.eqv UUA 0x00415555
+.eqv UUG 0x00475555
+.eqv UCU 0x00554355
+.eqv UCC 0x00434355
+.eqv UCA 0x00414355
+.eqv UCG 0x00474355
+.eqv UGU 0x00554755
+.eqv UGC 0x00434755
+.eqv UGA 0x00414755
+.eqv UGG 0x00474755
+.eqv UAU 0x00554155
+.eqv UAC 0x00434155
+.eqv UAA 0x00414155
+.eqv UAG 0x00474155
+
+.data
+
+methionine:    .asciiz "Methionine\n"
+phenylalanine: .asciiz "Phenylalanine\n"
+leucine:       .asciiz "Leucine\n"
+serine:        .asciiz "Serine\n"
+tyrosine:      .asciiz "Tyrosine\n"
+cysteine:      .asciiz "Cysteine\n"
+tryptophan:    .asciiz "Tryptophan\n"
+
+.text
+
+proteins:
+       move    $t1, $a1          
+       sb      $zero, 0($t1)     
+       j       read_codon
+
+copy_string:
+       lb      $t2, 0($t0)       # load source byte
+       sb      $t2, 0($t1)       # store in output
+       addi    $t0, $t0, 1
+       addi    $t1, $t1, 1
+       bne     $t2, $zero, copy_string
+       addi    $t1, $t1, -1      # adjust output pointer for next append
+       addi    $a0, $a0, 3       # advance input pointer past codon
+       j       read_codon
+
+read_codon:
+       lb      $t2, 0($a0)
+       beq     $t2, $zero, stop  # end of sequence
+
+       lb      $t2, 1($a0)
+       beq     $t2, $zero, invalid
+
+       lb      $t2, 2($a0)
+       beq     $t2, $zero, invalid
+
+       ulw     $t3, 0($a0)
+       andi    $t3, $t3, 0x00ffffff
+
+       la      $t0, methionine
+       beq     $t3, AUG, copy_string
+
+       la      $t0, phenylalanine
+       beq     $t3, UUU, copy_string
+       beq     $t3, UUC, copy_string
+
+       la      $t0, leucine
+       beq     $t3, UUA, copy_string
+       beq     $t3, UUG, copy_string
+
+       la      $t0, tyrosine
+       beq     $t3, UAU, copy_string
+       beq     $t3, UAC, copy_string
+
+       la      $t0, cysteine
+       beq     $t3, UGU, copy_string
+       beq     $t3, UGC, copy_string
+
+       la      $t0, serine
+       beq     $t3, UCU, copy_string
+       beq     $t3, UCC, copy_string
+       beq     $t3, UCA, copy_string
+       beq     $t3, UCG, copy_string
+
+       la      $t0, tryptophan
+       beq     $t3, UGG, copy_string
+
+       beq     $t3, UAA, stop
+       beq     $t3, UAG, stop
+       beq     $t3, UGA, stop
+
+invalid:
+       sb      $zero, 0($a1)     # unknown codon, clear output
+
+stop:
+       jr      $ra
