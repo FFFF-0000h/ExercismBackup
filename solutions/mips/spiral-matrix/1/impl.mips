@@ -1,0 +1,96 @@
+.globl spiral_matrix
+
+spiral_matrix:
+    # Save return address
+    addiu $sp, $sp, -4
+    sw    $ra, 0($sp)
+
+    move  $t0, $a0           # $t0 = size (n)
+    move  $t1, $a1           # $t1 = matrix base pointer
+    mul   $v0, $t0, $t0      # total words = n * n
+
+    # Early exit if size == 0 (though constraints say >=1)
+    beqz  $t0, done
+
+    li    $t2, 1              # current value to fill
+    li    $t3, 0              # top = 0
+    addiu $t4, $t0, -1       # bottom = n - 1
+    li    $t5, 0              # left = 0
+    addiu $t6, $t0, -1       # right = n - 1
+
+loop:
+    # while top <= bottom and left <= right
+    bgt   $t3, $t4, done
+    bgt   $t5, $t6, done
+
+    # Fill top row (left to right)
+    move  $t7, $t5            # j = left
+top_loop:
+    bgt   $t7, $t6, top_done
+    mul   $t8, $t3, $t0
+    addu  $t8, $t8, $t7
+    sll   $t8, $t8, 2
+    addu  $t9, $t1, $t8
+    sw    $t2, 0($t9)
+    addiu $t2, $t2, 1
+    addiu $t7, $t7, 1
+    j     top_loop
+top_done:
+    addiu $t3, $t3, 1         # top++
+
+    # Fill right column (top to bottom)
+    bgt   $t3, $t4, done
+    move  $t7, $t3            # i = top
+right_loop:
+    bgt   $t7, $t4, right_done
+    mul   $t8, $t7, $t0
+    addu  $t8, $t8, $t6
+    sll   $t8, $t8, 2
+    addu  $t9, $t1, $t8
+    sw    $t2, 0($t9)
+    addiu $t2, $t2, 1
+    addiu $t7, $t7, 1
+    j     right_loop
+right_done:
+    addiu $t6, $t6, -1        # right--
+
+    # Fill bottom row (right to left)
+    bgt   $t5, $t6, done
+    bgt   $t3, $t4, done
+    move  $t7, $t6            # j = right
+bottom_loop:
+    blt   $t7, $t5, bottom_done
+    mul   $t8, $t4, $t0
+    addu  $t8, $t8, $t7
+    sll   $t8, $t8, 2
+    addu  $t9, $t1, $t8
+    sw    $t2, 0($t9)
+    addiu $t2, $t2, 1
+    addiu $t7, $t7, -1
+    j     bottom_loop
+bottom_done:
+    addiu $t4, $t4, -1        # bottom--
+
+    # Fill left column (bottom to top)
+    bgt   $t5, $t6, done
+    bgt   $t3, $t4, done
+    move  $t7, $t4            # i = bottom
+left_loop:
+    blt   $t7, $t3, left_done
+    mul   $t8, $t7, $t0
+    addu  $t8, $t8, $t5
+    sll   $t8, $t8, 2
+    addu  $t9, $t1, $t8
+    sw    $t2, 0($t9)
+    addiu $t2, $t2, 1
+    addiu $t7, $t7, -1
+    j     left_loop
+left_done:
+    addiu $t5, $t5, 1         # left++
+
+    j     loop
+
+done:
+    lw    $ra, 0($sp)
+    addiu $sp, $sp, 4
+    jr    $ra
