@@ -1,0 +1,129 @@
+.data
+fwa: .asciiz "For want of a "
+th:  .asciiz " the "
+wl:  .asciiz " was lost.\n"
+afw: .asciiz "And all for the want of a "
+dot: .asciiz ".\n"
+
+.text
+.globl recite
+
+recite:
+    addiu   $sp, $sp, -4
+    sw      $ra, 0($sp)
+
+    # Parse the first word
+    move    $t5, $a0            # first_start = input
+    move    $t2, $a0            # scanning pointer
+first_scan:
+    lb      $t0, 0($t2)
+    beq     $t0, $zero, first_done
+    beq     $t0, 0xa, first_done   # '\n'
+    addiu   $t2, $t2, 1
+    j       first_scan
+first_done:
+    subu    $t6, $t2, $t5       # first_len
+
+    # Decide if there are more words
+    lb      $t0, 0($t2)         # delimiter after first word
+    beq     $t0, $zero, final_only   # null -> single word
+    # delimiter is newline, check next byte
+    lb      $t0, 1($t2)
+    beq     $t0, $zero, final_only   # null after newline -> single word
+
+    # There is at least one more word
+    addiu   $a0, $t2, 1         # skip newline, set input pointer
+    move    $t7, $t5            # prev_start = first_start
+    move    $t8, $t6            # prev_len = first_len
+
+loop:
+    # Parse the next word (curr)
+    move    $t2, $a0            # curr_start
+    move    $t3, $a0            # scan pointer
+curr_scan:
+    lb      $t0, 0($t3)
+    beq     $t0, $zero, curr_done
+    beq     $t0, 0xa, curr_done
+    addiu   $t3, $t3, 1
+    j       curr_scan
+curr_done:
+    subu    $t9, $t3, $t2       # curr_len
+
+    # Output line: "For want of a <prev> the <curr> was lost.\n"
+    la      $a2, fwa
+    jal     copy_string
+    move    $a2, $t7
+    move    $a3, $t8
+    jal     copy_word
+    la      $a2, th
+    jal     copy_string
+    move    $a2, $t2
+    move    $a3, $t9
+    jal     copy_word
+    la      $a2, wl
+    jal     copy_string
+
+    # Move prev to curr for the next iteration
+    move    $t7, $t2
+    move    $t8, $t9
+
+    # Check if we have reached the end of input
+    lb      $t0, 0($t3)         # delimiter after curr
+    beq     $t0, $zero, final   # null -> end
+    # delimiter is newline, check next byte
+    lb      $t0, 1($t3)
+    beq     $t0, $zero, final   # null after newline -> end
+    # More words follow
+    addiu   $a0, $t3, 1         # skip newline
+    j       loop
+
+final_only:
+    # Only one word in the input -> output the final line
+    la      $a2, afw
+    jal     copy_string
+    move    $a2, $t5
+    move    $a3, $t6
+    jal     copy_word
+    la      $a2, dot
+    jal     copy_string
+    sb      $zero, 0($a1)
+    lw      $ra, 0($sp)
+    addiu   $sp, $sp, 4
+    jr      $ra
+
+final:
+    # Multi‑word input -> output the final line with the first word
+    la      $a2, afw
+    jal     copy_string
+    move    $a2, $t5
+    move    $a3, $t6
+    jal     copy_word
+    la      $a2, dot
+    jal     copy_string
+    sb      $zero, 0($a1)
+    lw      $ra, 0($sp)
+    addiu   $sp, $sp, 4
+    jr      $ra
+
+# Helper: copy a null‑terminated string from $a2 to output ($a1)
+copy_string:
+    lb      $t0, 0($a2)
+    beq     $t0, $zero, copy_string_done
+    sb      $t0, 0($a1)
+    addiu   $a2, $a2, 1
+    addiu   $a1, $a1, 1
+    j       copy_string
+copy_string_done:
+    jr      $ra
+
+# Helper: copy a word of length $a3 from $a2 to output ($a1)
+copy_word:
+    beq     $a3, $zero, copy_word_done
+    lb      $t0, 0($a2)
+    sb      $t0, 0($a1)
+    addiu   $a2, $a2, 1
+    addiu   $a1, $a1, 1
+    addiu   $a3, $a3, -1
+    j       copy_word
+copy_word_done:
+    jr      $ra
