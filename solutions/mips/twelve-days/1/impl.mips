@@ -1,0 +1,69 @@
+.data
+verse1:  .asciiz "On the first day of Christmas my true love gave to me: a Partridge in a Pear Tree.\n"
+verse2:  .asciiz "On the second day of Christmas my true love gave to me: two Turtle Doves, and a Partridge in a Pear Tree.\n"
+verse3:  .asciiz "On the third day of Christmas my true love gave to me: three French Hens, two Turtle Doves, and a Partridge in a Pear Tree.\n"
+verse4:  .asciiz "On the fourth day of Christmas my true love gave to me: four Calling Birds, three French Hens, two Turtle Doves, and a Partridge in a Pear Tree.\n"
+verse5:  .asciiz "On the fifth day of Christmas my true love gave to me: five Gold Rings, four Calling Birds, three French Hens, two Turtle Doves, and a Partridge in a Pear Tree.\n"
+verse6:  .asciiz "On the sixth day of Christmas my true love gave to me: six Geese-a-Laying, five Gold Rings, four Calling Birds, three French Hens, two Turtle Doves, and a Partridge in a Pear Tree.\n"
+verse7:  .asciiz "On the seventh day of Christmas my true love gave to me: seven Swans-a-Swimming, six Geese-a-Laying, five Gold Rings, four Calling Birds, three French Hens, two Turtle Doves, and a Partridge in a Pear Tree.\n"
+verse8:  .asciiz "On the eighth day of Christmas my true love gave to me: eight Maids-a-Milking, seven Swans-a-Swimming, six Geese-a-Laying, five Gold Rings, four Calling Birds, three French Hens, two Turtle Doves, and a Partridge in a Pear Tree.\n"
+verse9:  .asciiz "On the ninth day of Christmas my true love gave to me: nine Ladies Dancing, eight Maids-a-Milking, seven Swans-a-Swimming, six Geese-a-Laying, five Gold Rings, four Calling Birds, three French Hens, two Turtle Doves, and a Partridge in a Pear Tree.\n"
+verse10: .asciiz "On the tenth day of Christmas my true love gave to me: ten Lords-a-Leaping, nine Ladies Dancing, eight Maids-a-Milking, seven Swans-a-Swimming, six Geese-a-Laying, five Gold Rings, four Calling Birds, three French Hens, two Turtle Doves, and a Partridge in a Pear Tree.\n"
+verse11: .asciiz "On the eleventh day of Christmas my true love gave to me: eleven Pipers Piping, ten Lords-a-Leaping, nine Ladies Dancing, eight Maids-a-Milking, seven Swans-a-Swimming, six Geese-a-Laying, five Gold Rings, four Calling Birds, three French Hens, two Turtle Doves, and a Partridge in a Pear Tree.\n"
+verse12: .asciiz "On the twelfth day of Christmas my true love gave to me: twelve Drummers Drumming, eleven Pipers Piping, ten Lords-a-Leaping, nine Ladies Dancing, eight Maids-a-Milking, seven Swans-a-Swimming, six Geese-a-Laying, five Gold Rings, four Calling Birds, three French Hens, two Turtle Doves, and a Partridge in a Pear Tree.\n"
+
+.align 2
+verse_table:
+    .word verse1, verse2, verse3, verse4, verse5, verse6, verse7, verse8, verse9, verse10, verse11, verse12
+
+.text
+.globl recite
+
+recite:
+    # Save registers
+    addiu $sp, $sp, -16
+    sw    $ra, 12($sp)
+    sw    $s0, 8($sp)
+    sw    $s1, 4($sp)
+    sw    $s2, 0($sp)
+
+    move  $s0, $a0          # start verse
+    move  $s1, $a1          # end verse
+    move  $s2, $a2          # output buffer
+
+    la    $t0, verse_table   # base of table
+
+recite_loop:
+    bgt   $s0, $s1, recite_done
+
+    # Get pointer to verse string
+    addiu $t1, $s0, -1      # 0-indexed
+    sll   $t1, $t1, 2       # multiply by 4
+    addu  $t1, $t0, $t1
+    lw    $t2, 0($t1)       # address of verse string
+
+    # Copy verse string to output buffer
+    move  $t3, $s2          # current output position
+copy_loop:
+    lb    $t4, 0($t2)
+    beqz  $t4, copy_done
+    sb    $t4, 0($t3)
+    addiu $t2, $t2, 1
+    addiu $t3, $t3, 1
+    j     copy_loop
+copy_done:
+    move  $s2, $t3          # update output pointer
+
+    addiu $s0, $s0, 1       # next verse
+    j     recite_loop
+
+recite_done:
+    # Null-terminate the output
+    sb    $zero, 0($s2)
+
+    lw    $ra, 12($sp)
+    lw    $s0, 8($sp)
+    lw    $s1, 4($sp)
+    lw    $s2, 0($sp)
+    addiu $sp, $sp, 16
+    jr    $ra
