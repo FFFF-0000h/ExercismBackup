@@ -1,0 +1,129 @@
+.globl raindrops
+
+.data
+pling_str: .asciiz "Pling"
+plang_str: .asciiz "Plang"
+plong_str: .asciiz "Plong"
+
+.text
+raindrops:
+    # Prologue: save return address
+    addiu $sp, $sp, -4
+    sw    $ra, 0($sp)
+
+    move  $t0, $a0          # $t0 = number
+    move  $t9, $a1          # $t9 = output pointer
+    li    $t8, 0            # flag: 0 = no output appended yet
+
+    # --- Check divisibility by 3 ---
+    li    $t1, 3
+    div   $t0, $t1
+    mfhi  $t2
+    bnez  $t2, skip3
+    la    $t3, pling_str
+    jal   append_string
+    li    $t8, 1
+skip3:
+
+    # --- Check divisibility by 5 ---
+    li    $t1, 5
+    div   $t0, $t1
+    mfhi  $t2
+    bnez  $t2, skip5
+    la    $t3, plang_str
+    jal   append_string
+    li    $t8, 1
+skip5:
+
+    # --- Check divisibility by 7 ---
+    li    $t1, 7
+    div   $t0, $t1
+    mfhi  $t2
+    bnez  $t2, skip7
+    la    $t3, plong_str
+    jal   append_string
+    li    $t8, 1
+skip7:
+
+    # --- If nothing appended, convert number to string ---
+    bnez  $t8, output_done
+    jal   int_to_string
+output_done:
+
+    # Terminate the string
+    sb    $zero, 0($t9)
+
+    # Epilogue: restore return address and return
+    lw    $ra, 0($sp)
+    addiu $sp, $sp, 4
+    jr    $ra
+
+
+# -----------------------------------------------------------------
+# append_string
+#   Copies a null-terminated string from $t3 to the address in $t9,
+#   and advances $t9 past the copied characters.
+#   Uses $t4 as temporary; all other registers preserved.
+# -----------------------------------------------------------------
+append_string:
+    lb    $t4, 0($t3)       # load character
+    beqz  $t4, append_done  # if '\0' we are done
+    sb    $t4, 0($t9)       # store to output
+    addiu $t3, $t3, 1       # advance source
+    addiu $t9, $t9, 1       # advance destination
+    j     append_string
+append_done:
+    jr    $ra
+
+
+# -----------------------------------------------------------------
+# int_to_string
+#   Converts the positive integer in $t0 to a decimal string
+#   at the address in $t9. Advances $t9 past the new digits.
+#   Uses $t1,$t2,$t3,$t5,$t6,$t7 and the stack.
+#   Returns with $sp unchanged.
+# -----------------------------------------------------------------
+int_to_string:
+    move  $t2, $t0           # $t2 = number to convert
+    li    $t1, 10            # divisor
+
+    # Allocate space on the stack for up to 10 digits
+    addiu $sp, $sp, -16
+    move  $t5, $sp           # $t5 points to free stack space
+    li    $t6, 0             # $t6 = digit count
+
+    # Special case: number is zero
+    bnez  $t2, int_loop
+    li    $t3, '0'
+    sb    $t3, 0($t9)
+    addiu $t9, $t9, 1
+    j     int_cleanup
+
+int_loop:
+    beqz  $t2, int_pop       # when quotient is zero, start popping
+    div   $t2, $t1           # lo = quotient, hi = remainder
+    mflo  $t2
+    mfhi  $t3
+    addiu $t3, $t3, '0'      # convert digit to ASCII
+    sb    $t3, 0($t5)        # store digit on stack
+    addiu $t5, $t5, 1
+    addiu $t6, $t6, 1
+    j     int_loop
+
+int_pop:
+    # Digits are stored in ascending address order; we need to output
+    # them in reverse. Start from the last stored digit.
+    addiu $t5, $t5, -1       # $t5 = address of last digit
+    li    $t7, 0              # pop counter
+int_pop_loop:
+    bge   $t7, $t6, int_cleanup
+    lb    $t3, 0($t5)
+    sb    $t3, 0($t9)
+    addiu $t9, $t9, 1
+    addiu $t5, $t5, -1
+    addiu $t7, $t7, 1
+    j     int_pop_loop
+
+int_cleanup:
+    addiu $sp, $sp, 16       # restore stack pointer
+    jr    $ra
