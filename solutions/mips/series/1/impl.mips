@@ -1,0 +1,78 @@
+.data
+sep: .asciiz ", "
+
+.text
+.globl slices
+
+slices:
+    # $a0 = series string
+    # $a1 = slice length
+    # $a2 = output buffer
+
+    # Compute length of series
+    move $t0, $a0          # use $t0 as series ptr
+    li   $t1, 0            # length = 0
+len_loop:
+    lb   $t2, 0($t0)
+    beqz $t2, len_done
+    addi $t1, $t1, 1       # increment length
+    addi $t0, $t0, 1       # advance pointer
+    j    len_loop
+len_done:
+
+    # $t1 = len
+    # Validate: slice_len <= 0 or slice_len > len
+    blez $a1, invalid
+    bgt  $a1, $t1, invalid
+
+    # Valid input, compute number of slices
+    sub  $t2, $t1, $a1     # len - n
+    addi $t2, $t2, 1       # + 1 -> num_slices
+
+    # Setup output
+    move $t3, $a2          # output pointer
+    move $t4, $a0          # series base
+    li   $t5, 0            # i = 0 (slice index)
+
+slice_loop:
+    # for i from 0 to num_slices-1
+    # Copy n characters from series+i
+    addu $t6, $t4, $t5     # address = series + i
+    li   $t7, 0            # j = 0
+copy_loop:
+    bge  $t7, $a1, copy_done
+    lb   $t8, 0($t6)       # load byte
+    sb   $t8, 0($t3)       # store to output
+    addi $t6, $t6, 1       # next source
+    addi $t3, $t3, 1       # next dest
+    addi $t7, $t7, 1
+    j    copy_loop
+copy_done:
+
+    # Check if not last slice (i < num_slices - 1)
+    addi $t9, $t2, -1      # num_slices - 1
+    bge  $t5, $t9, no_separator
+
+    # Append separator ", "
+    la   $t6, sep          # address of separator
+    lb   $t7, 0($t6)
+    sb   $t7, 0($t3)
+    addi $t3, $t3, 1
+    lb   $t7, 1($t6)
+    sb   $t7, 0($t3)
+    addi $t3, $t3, 1
+
+no_separator:
+    addi $t5, $t5, 1       # i++
+    blt  $t5, $t2, slice_loop
+
+    # Null terminate
+    sb   $zero, 0($t3)
+    j    done
+
+invalid:
+    # Output empty string
+    sb   $zero, 0($a2)
+
+done:
+    jr   $ra
