@@ -1,0 +1,84 @@
+.globl rows
+
+rows:
+    move  $t0, $a0           # rows
+    move  $t1, $a1           # output pointer
+    li    $t8, 0             # word count (use t8 instead of v0)
+
+    beqz  $t0, done
+
+    addiu $sp, $sp, -8
+    sw    $ra, 4($sp)
+    sw    $s0, 0($sp)
+
+    li    $t2, 1             # current row (1-based)
+
+row_loop:
+    bgt   $t2, $t0, exit
+
+    li    $t3, 0             # column index
+
+col_loop:
+    bge   $t3, $t2, row_done
+
+    move  $a0, $t2
+    addiu $a0, $a0, -1       # n = row - 1
+    move  $a1, $t3           # k = col
+    jal   binomial
+
+    sw    $v0, 0($t1)
+    addiu $t1, $t1, 4
+    addiu $t8, $t8, 1
+
+    addiu $t3, $t3, 1
+    j     col_loop
+
+row_done:
+    addiu $t2, $t2, 1
+    j     row_loop
+
+exit:
+    move  $v0, $t8           # return word count
+    lw    $s0, 0($sp)
+    lw    $ra, 4($sp)
+    addiu $sp, $sp, 8
+    jr    $ra
+
+done:
+    li    $v0, 0
+    jr    $ra
+
+binomial:
+    addiu $sp, $sp, -8
+    sw    $s0, 4($sp)
+    sw    $s1, 0($sp)
+
+    move  $s0, $a0           # n
+    move  $s1, $a1           # k
+
+    subu  $t4, $s0, $s1
+    blt   $s1, $t4, use_k
+    move  $s1, $t4
+
+use_k:
+    li    $v0, 1
+    li    $t5, 1
+
+binomial_loop:
+    bgt   $t5, $s1, binomial_done
+
+    subu  $t6, $s0, $t5
+    addiu $t6, $t6, 1
+    multu $v0, $t6
+    mflo  $v0
+    divu  $v0, $t5
+    mflo  $v0
+
+    addiu $t5, $t5, 1
+    j     binomial_loop
+
+binomial_done:
+    lw    $s1, 0($sp)
+    lw    $s0, 4($sp)
+    addiu $sp, $sp, 8
+    jr    $ra
