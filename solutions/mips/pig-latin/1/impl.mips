@@ -1,0 +1,262 @@
+.globl translate
+
+translate:
+    addiu $sp, $sp, -32
+    sw $ra, 28($sp)
+    sw $s0, 24($sp)
+    sw $s1, 20($sp)
+    sw $s2, 16($sp)
+    sw $s3, 12($sp)
+    sw $s4, 8($sp)
+    
+    move $s0, $a0        # input pointer
+    move $s1, $a1        # output pointer
+    
+.process_word:
+    lb $t0, 0($s0)
+    beqz $t0, .done
+    
+    # Copy spaces directly
+    bne $t0, ' ', .process_single_word
+    sb $t0, 0($s1)
+    addiu $s0, $s0, 1
+    addiu $s1, $s1, 1
+    j .process_word
+    
+.process_single_word:
+    # Find word end
+    move $t0, $s0
+.find_end:
+    lb $t1, 0($t0)
+    beqz $t1, .got_word
+    beq $t1, ' ', .got_word
+    addiu $t0, $t0, 1
+    j .find_end
+    
+.got_word:
+    move $s2, $t0        # end of word
+    move $s3, $s1        # save output start for this word
+    
+    # Get first character
+    lb $t1, 0($s0)
+    
+    # Check for vowel, "xr", or "yt" (Rule 1)
+    move $a0, $t1
+    jal is_vowel
+    bnez $v0, .rule1
+    
+    # Check for "xr"
+    li $t2, 'x'
+    bne $t1, $t2, .check_yt
+    lb $t2, 1($s0)
+    li $t3, 'r'
+    beq $t2, $t3, .rule1
+    j .not_rule1
+    
+.check_yt:
+    li $t2, 'y'
+    bne $t1, $t2, .not_rule1
+    lb $t2, 1($s0)
+    li $t3, 't'
+    beq $t2, $t3, .rule1
+    
+.not_rule1:
+    # Find the split point
+    # Walk through the word to find where to split
+    move $t2, $s0        # current position
+    
+    # If starts with 'y', treat as consonant and look for next vowel
+    # Actually, 'y' followed by vowel is Rule 4
+    
+    # Scan forward to find the pattern
+    move $t3, $s0        # scanning position
+    li $t4, 0            # consonant count (including initial y)
+    
+.scan:
+    beq $t3, $s2, .rule2_end  # reached end without vowel
+    
+    lb $t5, 0($t3)
+    
+    # Check if this is 'q' followed by 'u' (Rule 3)
+    li $t6, 'q'
+    bne $t5, $t6, .check_y
+    lb $t6, 1($t3)
+    li $t7, 'u'
+    bne $t6, $t7, .check_y
+    # Found "qu" - Rule 3 applies
+    move $a0, $t3        # position of 'q'
+    move $a1, $t4        # consonants before qu
+    j .rule3
+    
+.check_y:
+    # Check if this is 'y' preceded by consonants (Rule 4)
+    li $t6, 'y'
+    bne $t5, $t6, .check_vowel
+    
+    # It's 'y'. If preceded by at least one consonant, Rule 4
+    bgtz $t4, .rule4_y
+    # Otherwise, treat 'y' as consonant and continue
+    addiu $t4, $t4, 1
+    addiu $t3, $t3, 1
+    j .scan
+    
+.check_vowel:
+    # Check if it's a vowel
+    move $a0, $t5
+    addiu $sp, $sp, -8
+    sw $t3, 0($sp)
+    sw $t4, 4($sp)
+    jal is_vowel
+    lw $t3, 0($sp)
+    lw $t4, 4($sp)
+    addiu $sp, $sp, 8
+    
+    bnez $v0, .rule2     # Found vowel, use Rule 2
+    
+    # It's a consonant
+    addiu $t4, $t4, 1
+    addiu $t3, $t3, 1
+    j .scan
+    
+.rule4_y:
+    # t3 points to 'y'
+    move $t5, $t3        # save position of 'y'
+    j .rule4
+    
+.rule1:
+    # Copy entire word + "ay"
+    move $t2, $s0
+.rule1_copy:
+    beq $t2, $s2, .add_ay
+    lb $t3, 0($t2)
+    sb $t3, 0($s1)
+    addiu $t2, $t2, 1
+    addiu $s1, $s1, 1
+    j .rule1_copy
+    
+.rule2:
+    # t3 = position of first vowel
+    # Copy from vowel to end
+    move $t2, $t3
+.rule2_copy_after:
+    beq $t2, $s2, .rule2_copy_before
+    lb $t5, 0($t2)
+    sb $t5, 0($s1)
+    addiu $t2, $t2, 1
+    addiu $s1, $s1, 1
+    j .rule2_copy_after
+    
+.rule2_copy_before:
+    # Copy leading consonants
+    move $t2, $s0
+.rule2_copy_cons:
+    beq $t2, $t3, .add_ay
+    lb $t5, 0($t2)
+    sb $t5, 0($s1)
+    addiu $t2, $t2, 1
+    addiu $s1, $s1, 1
+    j .rule2_copy_cons
+    
+.rule2_end:
+    # No vowel found, copy all
+    move $t2, $s0
+.rule2_end_copy:
+    beq $t2, $s2, .add_ay
+    lb $t5, 0($t2)
+    sb $t5, 0($s1)
+    addiu $t2, $t2, 1
+    addiu $s1, $s1, 1
+    j .rule2_end_copy
+    
+.rule3:
+    # $a0 = position of 'q'
+    # $a1 = number of consonants before "qu"
+    move $t3, $a0        # position of 'q'
+    
+    # Copy after "qu"
+    addiu $t2, $t3, 2
+.rule3_copy_after:
+    beq $t2, $s2, .rule3_copy_before
+    lb $t5, 0($t2)
+    sb $t5, 0($s1)
+    addiu $t2, $t2, 1
+    addiu $s1, $s1, 1
+    j .rule3_copy_after
+    
+.rule3_copy_before:
+    # Copy consonants before "qu"
+    move $t2, $s0
+.rule3_copy_cons:
+    beq $t2, $t3, .rule3_add_qu
+    lb $t5, 0($t2)
+    sb $t5, 0($s1)
+    addiu $t2, $t2, 1
+    addiu $s1, $s1, 1
+    j .rule3_copy_cons
+    
+.rule3_add_qu:
+    li $t5, 'q'
+    sb $t5, 0($s1)
+    li $t5, 'u'
+    sb $t5, 1($s1)
+    addiu $s1, $s1, 2
+    j .add_ay
+    
+.rule4:
+    # t5 = position of 'y'
+    move $t3, $t5
+    
+    # Copy from 'y' onward
+    move $t2, $t3
+.rule4_copy_after:
+    beq $t2, $s2, .rule4_copy_before
+    lb $t5, 0($t2)
+    sb $t5, 0($s1)
+    addiu $t2, $t2, 1
+    addiu $s1, $s1, 1
+    j .rule4_copy_after
+    
+.rule4_copy_before:
+    # Copy consonants before 'y'
+    move $t2, $s0
+.rule4_copy_cons:
+    beq $t2, $t3, .add_ay
+    lb $t5, 0($t2)
+    sb $t5, 0($s1)
+    addiu $t2, $t2, 1
+    addiu $s1, $s1, 1
+    j .rule4_copy_cons
+    
+.add_ay:
+    li $t5, 'a'
+    sb $t5, 0($s1)
+    li $t5, 'y'
+    sb $t5, 1($s1)
+    addiu $s1, $s1, 2
+    
+.next_word:
+    move $s0, $s2
+    j .process_word
+    
+.done:
+    sb $zero, 0($s1)
+    
+    lw $ra, 28($sp)
+    lw $s0, 24($sp)
+    lw $s1, 20($sp)
+    lw $s2, 16($sp)
+    lw $s3, 12($sp)
+    lw $s4, 8($sp)
+    addiu $sp, $sp, 32
+    jr $ra
+
+is_vowel:
+    li $v0, 1
+    beq $a0, 'a', .done_vowel
+    beq $a0, 'e', .done_vowel
+    beq $a0, 'i', .done_vowel
+    beq $a0, 'o', .done_vowel
+    beq $a0, 'u', .done_vowel
+    li $v0, 0
+.done_vowel:
+    jr $ra
