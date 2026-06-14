@@ -1,0 +1,100 @@
+.globl primes
+
+primes:
+    # Allocate stack frame: save ra, s0, s1, s2, s3
+    addiu $sp, $sp, -24
+    sw    $ra, 20($sp)
+    sw    $s0, 16($sp)          # limit
+    sw    $s1, 12($sp)          # destination pointer
+    sw    $s2, 8($sp)           # temporary use
+    sw    $s3, 4($sp)           # sieve base pointer
+
+    move  $s0, $a0               # limit
+    move  $s1, $a1               # destination array
+
+    li    $t0, 2
+    blt   $s0, $t0, return_zero
+
+    # Allocate sieve array of (limit+1) bytes, rounded up to multiple of 4
+    addiu $t0, $s0, 1            # size = limit + 1
+    addiu $t0, $t0, 3
+    srl   $t0, $t0, 2
+    sll   $t0, $t0, 2           # round up to multiple of 4
+    subu  $sp, $sp, $t0          # allocate on stack
+    move  $s3, $sp               # s3 = base of sieve
+
+    # Initialize all entries to 1 (true)
+    move  $t1, $s3
+    addu  $t2, $t1, $t0          # end address
+    li    $t3, 1
+init_loop:
+    sb    $t3, 0($t1)
+    addiu $t1, $t1, 1
+    bne   $t1, $t2, init_loop
+
+    # 0 and 1 are not prime
+    sb    $zero, 0($s3)          # index 0
+    sb    $zero, 1($s3)          # index 1
+
+    # Sieve loop
+    li    $t0, 2                 # i = 2
+sieve_loop:
+    mul   $t1, $t0, $t0          # i * i
+    bgt   $t1, $s0, collect      # if i*i > limit, done
+
+    addu  $t2, $s3, $t0          # address of sieve[i]
+    lbu   $t3, 0($t2)
+    beqz  $t3, next_i            # if not prime, skip
+
+    # Mark multiples starting from i*i
+    move  $t4, $t1               # j = i*i
+mark_loop:
+    bgt   $t4, $s0, next_i       # if j > limit, done marking
+    addu  $t2, $s3, $t4
+    sb    $zero, 0($t2)          # sieve[j] = 0
+    addu  $t4, $t4, $t0          # j += i
+    j     mark_loop
+
+next_i:
+    addiu $t0, $t0, 1
+    j     sieve_loop
+
+collect:
+    li    $t0, 2                 # i = 2
+    move  $t5, $s1               # output pointer
+    li    $t6, 0                 # prime count
+collect_loop:
+    bgt   $t0, $s0, done_collect
+    addu  $t1, $s3, $t0
+    lbu   $t2, 0($t1)
+    beqz  $t2, next_collect_i
+    sw    $t0, 0($t5)            # store prime
+    addiu $t5, $t5, 4
+    addiu $t6, $t6, 1
+next_collect_i:
+    addiu $t0, $t0, 1
+    j     collect_loop
+
+done_collect:
+    move  $v0, $t6               # return count
+
+    # Deallocate sieve array
+    addiu $t0, $s0, 1
+    addiu $t0, $t0, 3
+    srl   $t0, $t0, 2
+    sll   $t0, $t0, 2
+    addu  $sp, $sp, $t0
+
+    j     restore_and_return
+
+return_zero:
+    li    $v0, 0
+
+restore_and_return:
+    lw    $ra, 20($sp)
+    lw    $s0, 16($sp)
+    lw    $s1, 12($sp)
+    lw    $s2, 8($sp)
+    lw    $s3, 4($sp)
+    addiu $sp, $sp, 24
+    jr    $ra
