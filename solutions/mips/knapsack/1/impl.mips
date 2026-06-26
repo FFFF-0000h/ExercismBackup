@@ -1,0 +1,84 @@
+.globl maximum_value
+
+maximum_value:
+    # Base cases
+    blez    $a2, .Lreturn_zero    # no items left
+    blez    $a3, .Lreturn_zero    # no capacity left
+
+    # Save ra
+    addiu   $sp, $sp, -4
+    sw      $ra, 0($sp)
+
+    # Get current item's weight and value
+    lw      $t0, 0($a0)           # weight[i]
+    lw      $t1, 0($a1)           # value[i]
+
+    # First, compute result WITHOUT taking this item
+    # Save current item's weight and value
+    addiu   $sp, $sp, -16
+    sw      $a0, 12($sp)
+    sw      $a1, 8($sp)
+    sw      $a2, 4($sp)
+    sw      $a3, 0($sp)
+
+    addiu   $a0, $a0, 4           # next weight
+    addiu   $a1, $a1, 4           # next value
+    addiu   $a2, $a2, -1          # n-1
+
+    jal     maximum_value           # v0 = max without this item
+    move    $t2, $v0               # t2 = result without
+
+    # Restore state
+    lw      $a3, 0($sp)
+    lw      $a2, 4($sp)
+    lw      $a1, 8($sp)
+    lw      $a0, 12($sp)
+    addiu   $sp, $sp, 16
+
+    # Now check if we can take this item
+    lw      $t0, 0($a0)            # weight[i] again
+    lw      $t1, 0($a1)            # value[i] again
+
+    bgt     $t0, $a3, .Lskip_item   # too heavy, return result without
+
+    # Compute result WITH taking this item
+    addiu   $sp, $sp, -16
+    sw      $t1, 12($sp)            # save value[i]
+    sw      $t2, 8($sp)             # save result without
+    sw      $a0, 4($sp)
+    sw      $ra, 0($sp)
+
+    addiu   $a0, $a0, 4
+    addiu   $a1, $a1, 4
+    addiu   $a2, $a2, -1
+    subu    $a3, $a3, $t0
+
+    jal     maximum_value           # v0 = max with remaining items
+    lw      $t1, 12($sp)            # restore value[i]
+    addu    $v0, $v0, $t1           # add value[i]
+    lw      $t2, 8($sp)             # restore result without
+
+    # Return max of the two
+    ble     $v0, $t2, .Luse_without
+    b       .Lcleanup
+
+.Lskip_item:
+    move    $v0, $t2
+    b       .Ldone
+
+.Luse_without:
+    move    $v0, $t2
+    b       .Lcleanup
+
+.Lcleanup:
+    lw      $ra, 0($sp)
+    addiu   $sp, $sp, 16
+
+.Ldone:
+    lw      $ra, 0($sp)
+    addiu   $sp, $sp, 4
+    jr      $ra
+
+.Lreturn_zero:
+    li      $v0, 0
+    jr      $ra
